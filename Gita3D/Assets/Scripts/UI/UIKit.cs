@@ -13,7 +13,7 @@ namespace Gita.UI
     {
         // ---- sprite factory ---------------------------------------------
         // Generated once and reused; 9-sliced so one texture serves every size.
-        static Sprite _rounded, _roundedSoft, _circle, _glow, _vGradient, _solid;
+        static Sprite _rounded, _roundedSoft, _circle, _glow, _vGradient, _solid, _triangle;
 
         public static Sprite Rounded     => _rounded     ??= RoundedRect(32);
         public static Sprite RoundedSoft => _roundedSoft ??= RoundedRect(56);
@@ -21,6 +21,7 @@ namespace Gita.UI
         public static Sprite Glow        => _glow        ??= RadialGlow(128);
         public static Sprite VGradient   => _vGradient   ??= VerticalGradient(256);
         public static Sprite Solid       => _solid       ??= SolidSprite();
+        public static Sprite Triangle    => _triangle    ??= TriangleSprite(64);
 
         /// <summary>A 9-sliced rounded rectangle with antialiased corners.</summary>
         public static Sprite RoundedRect(int radius)
@@ -100,6 +101,35 @@ namespace Gita.UI
             return Sprite.Create(tex, new Rect(0, 0, 1, height), new Vector2(0.5f, 0.5f));
         }
 
+
+        /// <summary>
+        /// A right-pointing triangle, for the play control. Drawn rather than set as a
+        /// glyph: the bundled faces are Latin and Devanagari text fonts, and whether any
+        /// given one carries U+25B6 is not something to leave to chance on a device we
+        /// cannot test - a missing glyph would put a blank box on the main control.
+        /// </summary>
+        public static Sprite TriangleSprite(int size)
+        {
+            var tex = NewTexture(size, size);
+            var px = new Color[size * size];
+
+            // Apex at the right edge, base at the left, with a one-pixel feather along
+            // the two sloping sides.
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float fy = (y + 0.5f) / size;          // 0 at the bottom
+                float fx = (x + 0.5f) / size;
+                float halfWidth = 0.5f * (1f - fx);    // how far from the centre line
+                float distance = Mathf.Abs(fy - 0.5f);
+                float a = Mathf.Clamp01((halfWidth - distance) * size);
+                px[y * size + x] = new Color(1f, 1f, 1f, a);
+            }
+
+            tex.SetPixels(px);
+            tex.Apply(false, true);
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
         public static Sprite SolidSprite()
         {
             var tex = NewTexture(4, 4);
@@ -155,9 +185,14 @@ namespace Gita.UI
             return img;
         }
 
+        /// <summary>
+        /// A block of text. <paramref name="size"/> is the authored size; the reader's
+        /// text-size setting is applied on top of it unless <paramref name="scalable"/>
+        /// is false, which is only the case for text another component already sizes.
+        /// </summary>
         public static TextMeshProUGUI Text(string name, Transform parent, string content,
             TMP_FontAsset font, float size, Color color,
-            TextAlignmentOptions align = TextAlignmentOptions.TopLeft)
+            TextAlignmentOptions align = TextAlignmentOptions.TopLeft, bool scalable = true)
         {
             var rt = Node(name, parent);
             var t = rt.gameObject.AddComponent<TextMeshProUGUI>();
@@ -170,9 +205,37 @@ namespace Gita.UI
             t.raycastTarget = false;
             t.overflowMode = TextOverflowModes.Overflow;
             t.textWrappingMode = TextWrappingModes.Normal;
+            if (scalable) ScaledText.Attach(rt.gameObject, size);
             return t;
         }
 
+
+        /// <summary>
+        /// Lets a block shrink to fit the box it is in rather than spilling out of it.
+        ///
+        /// The reader can set the type up to 40% larger than it was authored, and most
+        /// of this interface is fixed bands - a header strip, a chip, a button - that
+        /// cannot grow to suit. Those blocks get this: the authored size stays the
+        /// ceiling and the text steps down only as far as it must, and only when it
+        /// would otherwise not fit. Running text inside a scrolling column never gets
+        /// it, because there the right answer is for the column to get longer.
+        /// </summary>
+        public static TextMeshProUGUI Fit(this TextMeshProUGUI t, float minRatio = 0.62f)
+        {
+            if (t == null) return null;
+
+            t.enableAutoSizing = true;
+            t.fontSizeMax = t.fontSize;
+            t.fontSizeMin = t.fontSize * minRatio;
+
+            var scaled = t.GetComponent<ScaledText>();
+            if (scaled != null)
+            {
+                scaled.MinRatio = minRatio;
+                scaled.ApplyScale();
+            }
+            return t;
+        }
         /// <summary>A tappable region. Transparent by default; pass a tint for a visible button.</summary>
         public static Button Tappable(string name, Transform parent, Action onClick, Color? tint = null)
         {

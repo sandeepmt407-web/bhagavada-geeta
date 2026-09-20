@@ -60,7 +60,7 @@ namespace Gita.UI
             title.overflowMode = TextOverflowModes.Ellipsis;
 
             _countLabel = UIKit.Text("Count", Header, "",
-                Theme.Sans, 19f, Theme.Muted, TextAlignmentOptions.Center);
+                Theme.Sans, 23f, Theme.Muted, TextAlignmentOptions.Center);
             _countLabel.rectTransform.TopBand(116f, 28f, Theme.Gutter + 140f);
             _countLabel.characterSpacing = 4f;
 
@@ -106,7 +106,7 @@ namespace Gita.UI
             Scroll.scrollSensitivity = 28f;
 
             _emptyLabel = UIKit.Text("Empty", Root, "",
-                Theme.Sans, 24f, Theme.Muted, TextAlignmentOptions.Center);
+                Theme.Sans, 28f, Theme.Muted, TextAlignmentOptions.Center);
             _emptyLabel.rectTransform.Inset(Theme.Gutter * 1.6f, headerHeight + 140f,
                 Theme.Gutter * 1.6f, 0f);
             _emptyLabel.gameObject.SetActive(false);
@@ -166,8 +166,8 @@ namespace Gita.UI
         {
             var host = UIKit.Node($"V{verse.c}_{verse.v}", Content);
             var el = host.gameObject.AddComponent<LayoutElement>();
-            el.preferredHeight = 168f;
-            el.minHeight = 168f;
+            el.preferredHeight = Theme.Scaled(196f);
+            el.minHeight = el.preferredHeight;
 
             var btn = UIKit.Tappable("Tap", host,
                 () => AppRoot.Instance?.OpenVerse(verse.c, verse.v),
@@ -175,8 +175,9 @@ namespace Gita.UI
             btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
 
             var reference = UIKit.Text("Ref", btn.transform, $"{verse.c}.{verse.v}",
-                Theme.SansBold, 22f, Theme.Saffron, TextAlignmentOptions.TopLeft);
-            reference.rectTransform.TopBand(20f, 30f, 28f);
+                Theme.SansBold, 26f, Theme.Saffron, TextAlignmentOptions.TopLeft);
+            reference.rectTransform.TopBand(Theme.Scaled(20f), Theme.Scaled(34f), 28f);
+            reference.Fit(0.6f);
             reference.characterSpacing = 4f;
 
             // A dot for a verse already read, so progress is visible while browsing.
@@ -192,8 +193,10 @@ namespace Gita.UI
 
             var snippet = UIKit.Text("Text", btn.transform,
                 Snippet(GitaDatabase.TextOf(verse, AppSettings.Edition), 150),
-                Theme.Serif, 24f, Theme.Parchment, TextAlignmentOptions.TopLeft);
-            snippet.rectTransform.TopBand(54f, 100f, 28f);
+                Theme.Serif, 29f, Theme.Parchment, TextAlignmentOptions.TopLeft);
+            snippet.rectTransform.TopBand(Theme.Scaled(60f), Theme.Scaled(124f), 28f);
+            snippet.overflowMode = TextOverflowModes.Ellipsis;
+            snippet.Fit(0.6f);
             snippet.lineSpacing = 6f;
             snippet.overflowMode = TextOverflowModes.Ellipsis;
 

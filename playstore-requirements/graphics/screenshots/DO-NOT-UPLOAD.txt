@@ -1,0 +1,7 @@
+These are DRAFTS, for composition only. Do not upload them to the Play Store.
+
+They come from the desktop preview build, where Devanagari is not shaped: conjuncts do
+not form and the i-matra sits on the wrong side of its consonant. Android does the
+shaping; Windows has no equivalent. Anyone who reads Devanagari would spot it at once.
+
+Retake them on the phone with the APK installed. See ../../README.md, step 2.

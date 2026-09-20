@@ -35,7 +35,7 @@ namespace Gita.UI
 
         void BuildHeader()
         {
-            var header = UIKit.Node("Header", Root).TopBand(0f, 180f);
+            var header = UIKit.Node("Header", Root).TopBand(0f, 194f);
             var bg = UIKit.Panel("Bg", header, Theme.NightDeep.WithAlpha(0.97f), UIKit.Solid);
             bg.rectTransform.Inset(0f, 0f, 0f, 0f);
 
@@ -60,7 +60,7 @@ namespace Gita.UI
         void BuildScroll()
         {
             var viewport = UIKit.Node("Viewport", Root);
-            viewport.Inset(0f, 180f, 0f, 150f);
+            viewport.Inset(0f, 194f, 0f, 162f);
             viewport.gameObject.AddComponent<RectMask2D>();
             var catcher = viewport.gameObject.AddComponent<Image>();
             catcher.color = new Color(0f, 0f, 0f, 0f);
@@ -104,6 +104,8 @@ namespace Gita.UI
                 Theme.SansBold, Theme.SizeLabel, Theme.NightDeep, TextAlignmentOptions.Center);
             label.rectTransform.Inset(0f, 0f, 0f, 0f);
             label.characterSpacing = 8f;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.Fit(0.5f);
         }
 
         public override void OnShow() => Rebuild();
@@ -120,6 +122,10 @@ namespace Gita.UI
 
             Caption("The Sanskrit verse never changes. This chooses the translation "
                     + "you read and the voice that reads it.");
+
+            Heading("TEXT SIZE");
+            TextSizeRow();
+            TextSizeSample();
 
             Heading("LANGUAGE");
             foreach (var (lang, label) in GitaDatabase.Languages())
@@ -155,7 +161,21 @@ namespace Gita.UI
                     Rebuild();
                 });
 
+            VoiceRows();
             SpeedRow();
+            VoiceNote();
+
+            Heading("BACKGROUND MUSIC");
+            Row(AppSettings.MusicEnabled ? "Bansuri under the reading" : "Background music is off",
+                AppSettings.MusicEnabled
+                    ? "Steps out of the way while a verse is being read"
+                    : null,
+                AppSettings.MusicEnabled,
+                () =>
+                {
+                    AppSettings.MusicEnabled = !AppSettings.MusicEnabled;
+                    Rebuild();
+                });
 
             Heading("DAILY VERSE");
             Row(DailyVerse.Enabled ? "A verse each morning" : "Daily verse is off",
@@ -212,7 +232,7 @@ namespace Gita.UI
         void Caption(string text)
         {
             var t = UIKit.Text("Caption", _content, text,
-                Theme.Sans, 21f, Theme.Muted, TextAlignmentOptions.TopLeft);
+                Theme.Sans, 25f, Theme.Muted, TextAlignmentOptions.TopLeft);
             t.lineSpacing = 8f;
             _rows.Add(t.gameObject);
         }
@@ -221,8 +241,8 @@ namespace Gita.UI
         {
             var host = UIKit.Node("HeadingHost", _content);
             var el = host.gameObject.AddComponent<LayoutElement>();
-            el.preferredHeight = 62f;
-            el.minHeight = 62f;
+            el.preferredHeight = Theme.Scaled(62f);
+            el.minHeight = el.preferredHeight;
 
             var t = UIKit.Text("Heading", host, text,
                 Theme.SansBold, Theme.SizeCaption, Theme.Saffron, TextAlignmentOptions.BottomLeft);
@@ -237,7 +257,7 @@ namespace Gita.UI
 
             var host = UIKit.Node("Row", _content);
             var el = host.gameObject.AddComponent<LayoutElement>();
-            el.preferredHeight = twoLine ? 116f : 86f;
+            el.preferredHeight = Theme.Scaled(twoLine ? 134f : 98f);
             el.minHeight = el.preferredHeight;
 
             var btn = UIKit.Tappable("Tap", host, onTap,
@@ -247,21 +267,28 @@ namespace Gita.UI
             bool devanagari = ContainsDevanagari(title);
             var label = UIKit.Text("Label", btn.transform, title,
                 devanagari ? Theme.DevanagariUI : Theme.Sans,
-                25f, selected ? Theme.SaffronLit : Theme.Cream,
+                28f, selected ? Theme.SaffronLit : Theme.Cream,
                 TextAlignmentOptions.Left);
-            label.rectTransform.Inset(28f, twoLine ? 14f : 0f, 96f, twoLine ? 46f : 0f);
+            label.rectTransform.Inset(28f, twoLine ? Theme.Scaled(16f) : 0f, 96f,
+                twoLine ? Theme.Scaled(54f) : 0f);
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.overflowMode = TextOverflowModes.Ellipsis;
+            label.Fit(0.55f);
 
             if (twoLine)
             {
                 var sub = UIKit.Text("Sub", btn.transform, subtitle,
-                    Theme.Sans, 19f, Theme.Muted, TextAlignmentOptions.TopLeft);
-                sub.rectTransform.Inset(28f, 62f, 96f, 10f);
+                    Theme.Sans, 22f, Theme.Muted, TextAlignmentOptions.TopLeft);
+                sub.rectTransform.Inset(28f, Theme.Scaled(70f), 96f, 10f);
+                sub.textWrappingMode = TextWrappingModes.NoWrap;
+                sub.overflowMode = TextOverflowModes.Ellipsis;
+                sub.Fit(0.55f);
             }
 
             if (selected)
             {
                 var tick = UIKit.Text("Tick", btn.transform, "✓",
-                    Theme.SansBold, 32f, Theme.Saffron, TextAlignmentOptions.Center);
+                    Theme.SansBold, 36f, Theme.Saffron, TextAlignmentOptions.Center);
                 var rt = tick.rectTransform;
                 rt.anchorMin = rt.anchorMax = new Vector2(1f, 0.5f);
                 rt.pivot = new Vector2(0.5f, 0.5f);
@@ -272,22 +299,87 @@ namespace Gita.UI
             _rows.Add(host.gameObject);
         }
 
+
+        /// <summary>
+        /// Text size, with a line of real verse set at the chosen size underneath it.
+        /// A name like "Large" means nothing on its own; seeing the words at that size
+        /// is the only way to judge it, and the choice is made straight away rather
+        /// than after leaving the screen and finding out.
+        /// </summary>
+        void TextSizeRow()
+        {
+            var host = UIKit.Node("TextSizeHost", _content);
+            var el = host.gameObject.AddComponent<LayoutElement>();
+            el.preferredHeight = Theme.Scaled(96f);
+            el.minHeight = el.preferredHeight;
+
+            var options = AppSettings.TextSizes;
+            int chosen = AppSettings.TextSizeStep;
+
+            for (int i = 0; i < options.Length; i++)
+            {
+                var (name, scale) = options[i];
+                bool on = i == chosen;
+
+                var cell = UIKit.Node($"Size{i}", host);
+                cell.anchorMin = new Vector2(i / (float)options.Length, 0f);
+                cell.anchorMax = new Vector2((i + 1) / (float)options.Length, 0f);
+                cell.pivot = new Vector2(0.5f, 0f);
+                cell.offsetMin = new Vector2(i == 0 ? 0f : 6f, 0f);
+                cell.offsetMax = new Vector2(i == options.Length - 1 ? 0f : -6f, 0f);
+                cell.sizeDelta = new Vector2(cell.sizeDelta.x, Theme.Scaled(80f));
+
+                float captured = scale;
+                var btn = UIKit.Tappable("Tap", cell, () =>
+                    {
+                        AppSettings.TextScale = captured;
+                        Rebuild();
+                    },
+                    on ? Theme.Saffron.WithAlpha(0.92f) : Theme.TwilightLit.WithAlpha(0.55f));
+                btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
+
+                // The letter is drawn at that step's own size, so the row itself is the
+                // sample: the choices are visibly different heights.
+                var letter = UIKit.Text("A", btn.transform, "A",
+                    Theme.Serif, 22f + i * 7f, on ? Theme.NightDeep : Theme.Cream,
+                    TextAlignmentOptions.Center, scalable: false);
+                letter.rectTransform.Inset(0f, 0f, 0f, 22f);
+
+                var t = UIKit.Text("Label", btn.transform, name.ToUpperInvariant(),
+                    Theme.SansBold, 15f, on ? Theme.NightDeep : Theme.Muted,
+                    TextAlignmentOptions.Bottom, scalable: false);
+                t.rectTransform.Inset(0f, 0f, 0f, 8f);
+                t.characterSpacing = 3f;
+            }
+
+            _rows.Add(host.gameObject);
+        }
+
+        /// <summary>A real line of the text, set at whatever size is currently chosen.</summary>
+        void TextSizeSample()
+        {
+            var t = UIKit.Text("Sample", _content,
+                "You have a right to your actions, but never to the fruit of them.",
+                Theme.Serif, Theme.SizeBody, Theme.Parchment, TextAlignmentOptions.TopLeft);
+            t.lineSpacing = 10f;
+            _rows.Add(t.gameObject);
+        }
         /// <summary>Narration speed, as three discrete choices rather than a slider.</summary>
         void SpeedRow()
         {
             var host = UIKit.Node("SpeedHost", _content);
             var el = host.gameObject.AddComponent<LayoutElement>();
-            el.preferredHeight = 112f;
-            el.minHeight = 112f;
+            el.preferredHeight = Theme.Scaled(128f);
+            el.minHeight = el.preferredHeight;
 
             var label = UIKit.Text("Label", host, "READING PACE",
-                Theme.SansBold, 19f, Theme.Muted, TextAlignmentOptions.TopLeft);
-            label.rectTransform.TopBand(0f, 28f, 4f);
+                Theme.SansBold, 22f, Theme.Muted, TextAlignmentOptions.TopLeft);
+            label.rectTransform.TopBand(0f, 32f, 4f);
             label.characterSpacing = 6f;
 
             var options = new (string name, float rate)[]
             {
-                ("Slow", 0.7f), ("Natural", 0.85f), ("Brisk", 1.05f)
+                ("Slow", 0.72f), ("Natural", 0.88f), ("Brisk", 1.05f)
             };
 
             for (int i = 0; i < options.Length; i++)
@@ -301,7 +393,7 @@ namespace Gita.UI
                 cell.pivot = new Vector2(0.5f, 0f);
                 cell.offsetMin = new Vector2(i == 0 ? 0f : 6f, 0f);
                 cell.offsetMax = new Vector2(i == 2 ? 0f : -6f, 0f);
-                cell.sizeDelta = new Vector2(cell.sizeDelta.x, 66f);
+                cell.sizeDelta = new Vector2(cell.sizeDelta.x, Theme.Scaled(76f));
 
                 float captured = rate;
                 var btn = UIKit.Tappable("Tap", cell, () =>
@@ -313,25 +405,110 @@ namespace Gita.UI
                 btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
 
                 var t = UIKit.Text("Label", btn.transform, name,
-                    Theme.Sans, 21f, on ? Theme.NightDeep : Theme.Parchment,
+                    Theme.Sans, 24f, on ? Theme.NightDeep : Theme.Parchment,
                     TextAlignmentOptions.Center);
                 t.rectTransform.Inset(0f, 0f, 0f, 0f);
+                t.textWrappingMode = TextWrappingModes.NoWrap;
+                t.Fit(0.5f);
             }
 
             _rows.Add(host.gameObject);
         }
 
+
+        /// <summary>
+        /// Where the voice comes from, and what to do about it.
+        ///
+        /// The app does not ship recordings - 701 verses in several languages is a
+        /// studio project - so it speaks through whatever engine the phone has. It now
+        /// asks for the best voice that engine offers instead of the default one, but
+        /// the ceiling is still the device's, and the reader deserves to know that
+        /// rather than concluding the app simply sounds bad.
+        /// </summary>
+        void VoiceNote()
+        {
+            if (!AppSettings.AudioEnabled) return;
+
+            string voice = Narration.VoiceName;
+            string text = "The voice comes from your phone's speech engine, not from the app. "
+                        + "Installing Google Speech Services, and choosing a high-quality "
+                        + "voice in Android's language settings, makes a large difference.";
+            if (!string.IsNullOrEmpty(voice)) text += $"\nCurrently using: {voice}";
+
+            Caption(text);
+        }
+
+        /// <summary>
+        /// Every Indian voice this device can actually speak with, listed so the reader
+        /// can pick one and hear it.
+        ///
+        /// No two phones carry the same set - it depends on the engine, the Android
+        /// version and which voice data the owner installed - so the list is read off
+        /// the device rather than guessed at. Tapping a voice both selects it and speaks
+        /// a line in it, because a name like "Voice 3, high quality" tells nobody
+        /// anything until they have heard it.
+        /// </summary>
+        void VoiceRows()
+        {
+            if (!AppSettings.AudioEnabled) return;
+
+            var edition = AppSettings.Current;
+            if (edition == null) return;
+
+            var voices = Narration.Voices(edition.tts);
+            if (voices.Count == 0)
+            {
+                if (Narration.Available)
+                    Caption("This device lists no voice for this language. "
+                            + "Installing Google Speech Services usually adds several.");
+                return;
+            }
+
+            Heading("VOICE");
+
+            string chosen = AppSettings.VoiceFor(edition.lang);
+            bool anyChosen = !string.IsNullOrEmpty(chosen);
+
+            // "Best available" stays first and is the default: a reader who does not
+            // want to audition six voices should not have to.
+            Row("Best available", "Chosen automatically for this language", !anyChosen, () =>
+            {
+                AppSettings.SetVoiceFor(edition.lang, "");
+                Narration.Speak(SampleLine(edition.lang), edition.tts, AppSettings.SpeechRate);
+                Rebuild();
+            });
+
+            for (int i = 0; i < voices.Count; i++)
+            {
+                var voice = voices[i];
+                Row(voice.Describe(i), voice.Detail, voice.Name == chosen, () =>
+                {
+                    AppSettings.SetVoiceFor(edition.lang, voice.Name);
+                    Narration.Speak(SampleLine(edition.lang), edition.tts,
+                        AppSettings.SpeechRate, voiceName: voice.Name);
+                    Rebuild();
+                });
+            }
+        }
+
+        /// <summary>A line of the text itself to audition a voice on, not a test phrase.</summary>
+        static string SampleLine(string lang) => lang switch
+        {
+            "hi" => "तुम्हारा अधिकार केवल कर्म करने में है, उसके फलों में कभी नहीं।",
+            "fr" => "Ton droit est à l'action seule, jamais à ses fruits.",
+            _ => "You have a right to your actions, but never to the fruit of them.",
+        };
         /// <summary>When the daily verse arrives. Four sensible hours rather than a clock.</summary>
         void HourRow()
         {
             var host = UIKit.Node("HourHost", _content);
             var el = host.gameObject.AddComponent<LayoutElement>();
-            el.preferredHeight = 112f;
-            el.minHeight = 112f;
+            el.preferredHeight = Theme.Scaled(128f);
+            el.minHeight = el.preferredHeight;
 
             var label = UIKit.Text("Label", host, "ARRIVES AT",
-                Theme.SansBold, 19f, Theme.Muted, TextAlignmentOptions.TopLeft);
-            label.rectTransform.TopBand(0f, 28f, 4f);
+                Theme.SansBold, 22f, Theme.Muted, TextAlignmentOptions.TopLeft);
+            label.rectTransform.TopBand(0f, 32f, 4f);
             label.characterSpacing = 6f;
 
             var options = new (string name, int hour)[]
@@ -350,7 +527,7 @@ namespace Gita.UI
                 cell.pivot = new Vector2(0.5f, 0f);
                 cell.offsetMin = new Vector2(i == 0 ? 0f : 6f, 0f);
                 cell.offsetMax = new Vector2(i == options.Length - 1 ? 0f : -6f, 0f);
-                cell.sizeDelta = new Vector2(cell.sizeDelta.x, 66f);
+                cell.sizeDelta = new Vector2(cell.sizeDelta.x, Theme.Scaled(76f));
 
                 int captured = hour;
                 var btn = UIKit.Tappable("Tap", cell, () =>
@@ -362,9 +539,11 @@ namespace Gita.UI
                 btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
 
                 var t = UIKit.Text("Label", btn.transform, name,
-                    Theme.Sans, 20f, on ? Theme.NightDeep : Theme.Parchment,
+                    Theme.Sans, 23f, on ? Theme.NightDeep : Theme.Parchment,
                     TextAlignmentOptions.Center);
                 t.rectTransform.Inset(0f, 0f, 0f, 0f);
+                t.textWrappingMode = TextWrappingModes.NoWrap;
+                t.Fit(0.5f);
             }
 
             _rows.Add(host.gameObject);

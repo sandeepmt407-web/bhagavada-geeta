@@ -12,6 +12,9 @@ namespace Gita.World
     {
         VolumeProfile _profile;
         DepthOfField _dof;
+        Bloom _bloom;
+        ColorAdjustments _grade;
+        Vignette _vignette;
         CameraDirector _director;
 
         public static PostFX Create(CameraDirector director)
@@ -33,7 +36,7 @@ namespace Gita.World
             tone.mode.Override(TonemappingMode.ACES);
 
             // --- bloom: the sun blooming over the silhouettes is the whole look
-            var bloom = _profile.Add<Bloom>(true);
+            var bloom = _bloom = _profile.Add<Bloom>(true);
             bloom.intensity.Override(0.9f);
             bloom.threshold.Override(1.05f);
             bloom.scatter.Override(0.72f);
@@ -41,7 +44,7 @@ namespace Gita.World
             bloom.highQualityFiltering.Override(false); // costly on mobile, little gain here
 
             // --- grade: warm the highlights, cool and lift the shadows
-            var grade = _profile.Add<ColorAdjustments>(true);
+            var grade = _grade = _profile.Add<ColorAdjustments>(true);
             grade.postExposure.Override(-0.05f);
             grade.contrast.Override(8f);
             grade.saturation.Override(6f);
@@ -53,7 +56,7 @@ namespace Gita.World
             shadowsMidHigh.highlights.Override(new Vector4(1.10f, 1.00f, 0.86f, 0f));
 
             // --- vignette: settles the eye on the centre of frame
-            var vignette = _profile.Add<Vignette>(true);
+            var vignette = _vignette = _profile.Add<Vignette>(true);
             vignette.intensity.Override(0.20f);
             vignette.smoothness.Override(0.5f);
             vignette.color.Override(new Color(0.05f, 0.04f, 0.09f));
@@ -91,6 +94,29 @@ namespace Gita.World
             float start = Mathf.Lerp(_dof.gaussianStart.value, wantedStart, k);
             _dof.gaussianStart.Override(start);
             _dof.gaussianEnd.Override(start * 3.6f);
+        }
+
+        /// <summary>
+        /// Re-grades for a mood. Called continuously by the mood director while it
+        /// crossfades between two verses' looks, so it takes final values rather than
+        /// doing any easing of its own.
+        /// </summary>
+        public void SetGrade(float bloomIntensity, Color bloomTint,
+                             float saturation, float contrast, Color colorFilter,
+                             float vignette)
+        {
+            if (_bloom != null)
+            {
+                _bloom.intensity.Override(bloomIntensity);
+                _bloom.tint.Override(bloomTint);
+            }
+            if (_grade != null)
+            {
+                _grade.saturation.Override(saturation);
+                _grade.contrast.Override(contrast);
+                _grade.colorFilter.Override(colorFilter);
+            }
+            if (_vignette != null) _vignette.intensity.Override(vignette);
         }
 
         /// <summary>

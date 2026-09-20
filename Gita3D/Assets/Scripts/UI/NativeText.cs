@@ -113,6 +113,33 @@ namespace Gita.UI
 #endif
         }
 
+        /// <summary>
+        /// How tall shaped text would be, without rasterising it.
+        ///
+        /// Used to find a size that fits a fixed band: rendering each attempt would mean
+        /// building and throwing away textures, and this only lays the line out.
+        /// Returns -1 when the native path is unavailable, which the caller reads as
+        /// "do not clamp".
+        /// </summary>
+        public static int MeasureHeight(string text, string fontAsset, float textSizePx,
+            int maxWidthPx, float lineSpacing)
+        {
+            if (string.IsNullOrEmpty(text) || !Available) return -1;
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                return _rasterizer.CallStatic<int>("measureHeight",
+                    text, fontAsset, textSizePx, maxWidthPx, lineSpacing);
+            }
+            catch
+            {
+                return -1;
+            }
+#else
+            return -1;
+#endif
+        }
         /// <summary>Header (w,h as little-endian int32) followed by one alpha byte per pixel.</summary>
         static Texture2D Decode(byte[] data)
         {

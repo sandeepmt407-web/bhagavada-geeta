@@ -46,7 +46,7 @@ namespace Gita.UI
             var host = UIKit.Node("LangPill", Root);
             host.anchorMin = host.anchorMax = new Vector2(1f, 1f);
             host.pivot = new Vector2(1f, 1f);
-            host.sizeDelta = new Vector2(340f, 76f);
+            host.sizeDelta = new Vector2(368f, 84f);
             host.anchoredPosition = new Vector2(-Theme.Gutter, -26f);
 
             var btn = UIKit.Tappable("Tap", host,
@@ -55,7 +55,7 @@ namespace Gita.UI
             btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
 
             var glyph = UIKit.Text("Glyph", btn.transform, "☷",
-                Theme.Sans, 24f, Theme.Saffron, TextAlignmentOptions.Center);
+                Theme.Sans, 27f, Theme.Saffron, TextAlignmentOptions.Center);
             var grt = glyph.rectTransform;
             grt.anchorMin = grt.anchorMax = new Vector2(0f, 0.5f);
             grt.pivot = new Vector2(0.5f, 0.5f);
@@ -63,9 +63,13 @@ namespace Gita.UI
             grt.anchoredPosition = new Vector2(38f, 0f);
 
             _langLabel = UIKit.Text("Label", btn.transform, "",
-                Theme.Sans, 20f, Theme.Cream, TextAlignmentOptions.Left);
+                Theme.Sans, 24f, Theme.Cream, TextAlignmentOptions.Left);
             _langLabel.rectTransform.Inset(68f, 0f, 20f, 0f);
             _langLabel.overflowMode = TextOverflowModes.Ellipsis;
+            // One line, always: "English - Swami Sivananda" wraps at this size and the
+            // second line falls outside the pill.
+            _langLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            _langLabel.Fit(0.55f);
         }
 
         void BuildTitle()
@@ -76,23 +80,28 @@ namespace Gita.UI
                 Theme.Devanagari, NativeText.SerifDevanagari, Theme.SizeTitle,
                 Theme.Saffron, NativeText.AlignCenter);
             ((RectTransform)sanskrit.transform).TopBand(0f, 78f);
+            sanskrit.SetMaxHeightRef(78f);
             sanskrit.SetText("श्रीमद्भगवद्गीता");
 
             var english = UIKit.Text("English", block, "BHAGAVAD GITA",
                 Theme.Serif, Theme.SizeDisplay, Theme.Cream, TextAlignmentOptions.Top);
             english.rectTransform.TopBand(86f, 96f);
             english.characterSpacing = 12f;
+            english.textWrappingMode = TextWrappingModes.NoWrap;
+            english.Fit(0.5f);
 
             _subLabel = UIKit.Text("Sub", block, "",
-                Theme.Sans, Theme.SizeCaption, Theme.Muted, TextAlignmentOptions.Top);
+                Theme.Sans, Theme.SizeCaption, Theme.Parchment, TextAlignmentOptions.Top);
             _subLabel.rectTransform.TopBand(196f, 40f);
             _subLabel.characterSpacing = 3f;
+            _subLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            _subLabel.Fit(0.55f);
         }
 
         void BuildVerseCard()
         {
             var card = UIKit.Node("VerseCard", Root)
-                .BottomBand(bottom: 404f, height: 524f, inset: Theme.Gutter);
+                .BottomBand(bottom: 404f, height: 684f, inset: Theme.Gutter);
 
             var bg = UIKit.Panel("Bg", card, Theme.Twilight.WithAlpha(0.74f), UIKit.RoundedSoft);
             bg.rectTransform.Inset(0f, 0f, 0f, 0f);
@@ -108,16 +117,22 @@ namespace Gita.UI
             _saText = ShapedText.Create("Sanskrit", card,
                 Theme.Devanagari, NativeText.SerifDevanagari, Theme.SizeVerseSa - 6f,
                 Theme.Cream, NativeText.AlignCenter, lineSpacing: 1.25f);
-            ((RectTransform)_saText.transform).TopBand(84f, 172f, 44f);
+            ((RectTransform)_saText.transform).TopBand(84f, 194f, 44f);
+            _saText.SetMaxHeightRef(194f);
 
             _enText = UIKit.Text("Body", card, "",
                 Theme.Serif, Theme.SizeBody - 2f, Theme.Parchment, TextAlignmentOptions.Top);
-            _enText.rectTransform.TopBand(262f, 194f, 44f);
+            _enText.rectTransform.TopBand(290f, 322f, 44f);
             _enText.lineSpacing = 8f;
+            // Some readings run long; shrink to fit the card, then truncate cleanly
+            // rather than spilling past it.
+            _enText.overflowMode = TextOverflowModes.Ellipsis;
+            _enText.Fit(0.6f);
 
             _refText = UIKit.Text("Ref", card, "",
                 Theme.SansBold, Theme.SizeLabel, Theme.Saffron, TextAlignmentOptions.BottomRight);
-            _refText.rectTransform.BottomBand(24f, 38f, 44f);
+            _refText.rectTransform.BottomBand(24f, 44f, 44f);
+            _refText.Fit();
 
             var tap = UIKit.Tappable("Open", card, OpenToday);
             tap.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
@@ -134,8 +149,10 @@ namespace Gita.UI
             btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
 
             _continueLabel = UIKit.Text("Label", btn.transform, "",
-                Theme.Sans, 21f, Theme.SaffronLit, TextAlignmentOptions.Center);
+                Theme.Sans, 25f, Theme.SaffronLit, TextAlignmentOptions.Center);
             _continueLabel.rectTransform.Inset(0f, 0f, 0f, 0f);
+            _continueLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            _continueLabel.Fit(0.55f);
 
             _continueRow.SetActive(false);
         }
@@ -171,9 +188,11 @@ namespace Gita.UI
             btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
 
             var text = UIKit.Text("Label", btn.transform, label,
-                Theme.Sans, 21f, Theme.Cream, TextAlignmentOptions.Center);
+                Theme.Sans, 25f, Theme.Cream, TextAlignmentOptions.Center);
             text.rectTransform.Inset(4f, 0f, 4f, 0f);
             text.overflowMode = TextOverflowModes.Ellipsis;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.Fit(0.5f);
         }
 
         void Button(float bottom, string label, bool primary, Action onTap)
@@ -189,6 +208,8 @@ namespace Gita.UI
                 primary ? Theme.NightDeep : Theme.Cream, TextAlignmentOptions.Center);
             text.rectTransform.Inset(0f, 0f, 0f, 0f);
             text.characterSpacing = 6f;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.Fit(0.5f);
         }
 
         // ------------------------------------------------------------------

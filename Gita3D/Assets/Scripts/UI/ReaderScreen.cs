@@ -16,6 +16,11 @@ namespace Gita.UI
     /// The tabs are built from the corpus rather than hard-coded, so they follow the
     /// language the reader picked: the main translation, its poetic counterpart in the
     /// same language, Hindi (always offered), and the word-by-word gloss.
+    ///
+    /// Audio is one control, not two. There was a speaker in the tab row and a separate
+    /// mute in the header, which is two different answers to the same question; now a
+    /// single play/stop button in the footer both speaks the verse and decides whether
+    /// the next one speaks itself.
     /// </summary>
     public sealed class ReaderScreen : ScreenBase
     {
@@ -40,11 +45,25 @@ namespace Gita.UI
         Tab _tab = Tab.Translation;
 
         TextMeshProUGUI _chapterTitle, _position, _reference, _translit, _body, _attribution;
-        TextMeshProUGUI _muteGlyph, _bookmarkGlyph;
-        Image _muteBg, _bookmarkBg;
+        TextMeshProUGUI _bookmarkGlyph;
+        Image _bookmarkBg;
         ShapedText _sanskrit, _bodyDevanagari;
         RectTransform _content, _chipBar;
         ScrollRect _scroll;
+
+        Image _scrim;
+
+        // the shloka switch, on the verse itself
+        Image _sanskritBg, _sanskritIcon;
+        TextMeshProUGUI _sanskritLabel;
+
+        // the one audio control
+        Image _audioBg, _playIcon;
+        RectTransform _pauseIcon;
+        TextMeshProUGUI _audioLabel;
+        bool _wasActive;
+        float _audioPoll;
+        float _speakAt = -99f;
 
         readonly List<TabSpec> _tabs = new();
         readonly List<GameObject> _chipObjects = new();
@@ -53,13 +72,17 @@ namespace Gita.UI
         {
             base.Build(parent);
 
-            var scrim = UIKit.Panel("Scrim", Root, Theme.NightDeep.WithAlpha(0.86f), UIKit.Solid);
-            scrim.rectTransform.Inset(0f, 0f, 0f, 0f);
+            // The set behind the text should still read as a place, so this is as light as
+            // each look allows - which is not a constant. The mood director says how much
+            // darkening its current sky needs and this follows it; the bars at either end
+            // are near-opaque on their own, so the body is the only part relying on it.
+            _scrim = UIKit.Panel("Scrim", Root, Theme.NightDeep.WithAlpha(0.70f), UIKit.Solid);
+            _scrim.rectTransform.Inset(0f, 0f, 0f, 0f);
 
             BuildHeader();
             BuildScroll();
             _chipBar = UIKit.Node("Chips", Root)
-                .BottomBand(bottom: 158f, height: 108f, inset: Theme.Gutter);
+                .BottomBand(bottom: 176f, height: 116f, inset: Theme.Gutter);
             BuildFooter();
         }
 
@@ -67,7 +90,7 @@ namespace Gita.UI
 
         void BuildHeader()
         {
-            var header = UIKit.Node("Header", Root).TopBand(0f, 190f);
+            var header = UIKit.Node("Header", Root).TopBand(0f, 200f);
 
             var bg = UIKit.Panel("Bg", header, Theme.NightDeep.WithAlpha(0.97f), UIKit.Solid);
             bg.rectTransform.Inset(0f, 0f, 0f, 0f);
@@ -76,40 +99,36 @@ namespace Gita.UI
             var backRt = back.GetComponent<RectTransform>();
             backRt.anchorMin = backRt.anchorMax = new Vector2(0f, 1f);
             backRt.pivot = new Vector2(0.5f, 0.5f);
-            backRt.sizeDelta = new Vector2(104f, 84f);
-            backRt.anchoredPosition = new Vector2(Theme.Gutter + 52f, -106f);
+            backRt.sizeDelta = new Vector2(112f, 92f);
+            backRt.anchoredPosition = new Vector2(Theme.Gutter + 56f, -112f);
             var arrow = UIKit.Text("Arrow", back.transform, "←",
-                Theme.Sans, 44f, Theme.Cream, TextAlignmentOptions.Center);
+                Theme.Sans, 50f, Theme.Cream, TextAlignmentOptions.Center);
             arrow.rectTransform.Inset(0f, 0f, 0f, 0f);
 
-            // Three actions on the right, in order of how often they are wanted:
-            // mute nearest the thumb, then share, then the bookmark.
-            var mute = HeaderButton(header, "Mute", 42f, ToggleMute);
-            _muteBg = mute.image;
-            _muteGlyph = UIKit.Text("Glyph", mute.transform, "",
-                Theme.Sans, 32f, Theme.Cream, TextAlignmentOptions.Center);
-            _muteGlyph.rectTransform.Inset(0f, 0f, 0f, 0f);
-
-            var share = HeaderButton(header, "Share", 130f, ShareCurrent);
+            // Two actions on the right. Audio used to be a third; it now lives in the
+            // footer as a single play/stop control.
+            var share = HeaderButton(header, "Share", 46f, ShareCurrent);
             var shareGlyph = UIKit.Text("Glyph", share.transform, "↗",
-                Theme.Sans, 32f, Theme.Cream, TextAlignmentOptions.Center);
+                Theme.Sans, 36f, Theme.Cream, TextAlignmentOptions.Center);
             shareGlyph.rectTransform.Inset(0f, 0f, 0f, 0f);
 
-            var mark = HeaderButton(header, "Bookmark", 218f, ToggleBookmark);
+            var mark = HeaderButton(header, "Bookmark", 142f, ToggleBookmark);
             _bookmarkBg = mark.image;
             _bookmarkGlyph = UIKit.Text("Glyph", mark.transform, "",
-                Theme.Sans, 30f, Theme.Cream, TextAlignmentOptions.Center);
+                Theme.Sans, 34f, Theme.Cream, TextAlignmentOptions.Center);
             _bookmarkGlyph.rectTransform.Inset(0f, 0f, 0f, 0f);
 
             _chapterTitle = UIKit.Text("Chapter", header, "",
-                Theme.Serif, 29f, Theme.Cream, TextAlignmentOptions.Center);
-            _chapterTitle.rectTransform.TopBand(64f, 42f, Theme.Gutter + 272f);
+                Theme.Serif, 34f, Theme.Cream, TextAlignmentOptions.Center);
+            _chapterTitle.rectTransform.TopBand(58f, 48f, Theme.Gutter + 220f);
             _chapterTitle.overflowMode = TextOverflowModes.Ellipsis;
+            _chapterTitle.Fit();
 
             _position = UIKit.Text("Position", header, "",
-                Theme.Sans, 20f, Theme.Muted, TextAlignmentOptions.Center);
-            _position.rectTransform.TopBand(110f, 32f, Theme.Gutter + 272f);
+                Theme.Sans, 23f, Theme.Muted, TextAlignmentOptions.Center);
+            _position.rectTransform.TopBand(114f, 36f, Theme.Gutter + 220f);
             _position.characterSpacing = 3f;
+            _position.Fit();
 
             var rule = UIKit.Panel("Rule", header, Theme.Saffron.WithAlpha(0.35f), UIKit.Solid);
             rule.rectTransform.BottomBand(0f, 2f);
@@ -123,15 +142,15 @@ namespace Gita.UI
             var rt = btn.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(80f, 82f);
-            rt.anchoredPosition = new Vector2(-Theme.Gutter - inset, -106f);
+            rt.sizeDelta = new Vector2(88f, 90f);
+            rt.anchoredPosition = new Vector2(-Theme.Gutter - inset, -112f);
             return btn;
         }
 
         void BuildScroll()
         {
             var viewport = UIKit.Node("Viewport", Root);
-            viewport.Inset(0f, 190f, 0f, 300f);
+            viewport.Inset(0f, 200f, 0f, 304f);
             viewport.gameObject.AddComponent<RectMask2D>();
 
             var catcher = viewport.gameObject.AddComponent<Image>();
@@ -156,23 +175,21 @@ namespace Gita.UI
             var fitter = _content.gameObject.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            _reference = UIKit.Text("Reference", _content, "",
-                Theme.SansBold, Theme.SizeCaption, Theme.Saffron, TextAlignmentOptions.Center);
-            _reference.characterSpacing = 8f;
+            BuildReferenceRow();
 
             _sanskrit = ShapedText.Create("Sanskrit", _content,
                 Theme.Devanagari, NativeText.SerifDevanagari, Theme.SizeVerseSa,
                 Theme.Cream, NativeText.AlignCenter, lineSpacing: 1.28f);
 
             _translit = UIKit.Text("Translit", _content, "",
-                Theme.Serif, 26f, Theme.Muted, TextAlignmentOptions.Center);
+                Theme.Serif, 32f, Theme.Muted, TextAlignmentOptions.Center);
             _translit.lineSpacing = 8f;
             _translit.fontStyle = FontStyles.Italic;
 
             AddRule(_content);
 
             _attribution = UIKit.Text("Attribution", _content, "",
-                Theme.Sans, 19f, Theme.Saffron.WithAlpha(0.7f), TextAlignmentOptions.Center);
+                Theme.Sans, 23f, Theme.Saffron.WithAlpha(0.7f), TextAlignmentOptions.Center);
             _attribution.characterSpacing = 5f;
 
             _body = UIKit.Text("Body", _content, "",
@@ -201,6 +218,83 @@ namespace Gita.UI
             swipe.onSwipeRight = Previous;
         }
 
+
+        /// <summary>
+        /// The verse number, with the shloka control beside it.
+        ///
+        /// The control belongs here rather than in settings or the footer: it sits on
+        /// the Sanskrit it decides the fate of, and the line it shares was empty space
+        /// either side of a centred "2.47", so it costs no height. It is a standing
+        /// switch, not a play button - whichever way it is set, every verse opens
+        /// reading that, so nobody presses play on each page.
+        /// </summary>
+        void BuildReferenceRow()
+        {
+            var row = UIKit.Node("ReferenceRow", _content);
+            var el = row.gameObject.AddComponent<LayoutElement>();
+            el.preferredHeight = Theme.Scaled(66f);
+            el.minHeight = el.preferredHeight;
+
+            _reference = UIKit.Text("Reference", row, "",
+                Theme.SansBold, Theme.SizeCaption, Theme.Saffron, TextAlignmentOptions.Center);
+            _reference.rectTransform.Inset(0f, 0f, 0f, 0f);
+            _reference.characterSpacing = 8f;
+
+            var btn = UIKit.Tappable("Shloka", row, ToggleSanskrit,
+                Theme.TwilightLit.WithAlpha(0.7f));
+            var rt = btn.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(1f, 0.5f);
+            rt.pivot = new Vector2(1f, 0.5f);
+            rt.sizeDelta = new Vector2(168f, Theme.Scaled(60f));
+            rt.anchoredPosition = Vector2.zero;
+            btn.image.sprite = UIKit.RoundedSoft;
+            _sanskritBg = btn.image;
+
+            _sanskritIcon = UIKit.Raw("Play", btn.transform, Theme.Saffron, UIKit.Triangle);
+            var icon = _sanskritIcon.rectTransform;
+            icon.anchorMin = icon.anchorMax = new Vector2(0f, 0.5f);
+            icon.pivot = new Vector2(0f, 0.5f);
+            icon.sizeDelta = new Vector2(24f, 25f);
+            icon.anchoredPosition = new Vector2(20f, 0f);
+
+            // Set in Latin, not "संस्कृत". Labels outside the verse blocks go through
+            // TextMeshPro, which cannot form the conjunct in that word - it would render
+            // visibly wrong on a handset, which is the one thing this app must not do to
+            // Devanagari.
+            _sanskritLabel = UIKit.Text("Label", btn.transform, "SHLOKA",
+                Theme.SansBold, 21f, Theme.Parchment, TextAlignmentOptions.Center);
+            _sanskritLabel.characterSpacing = 3f;
+            _sanskritLabel.rectTransform.Inset(48f, 0f, 12f, 0f);
+            _sanskritLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            _sanskritLabel.Fit(0.6f);
+        }
+
+        /// <summary>
+        /// Switches between hearing the shloka and hearing what it means, and reads the
+        /// verse again straight away so the choice is audible rather than theoretical.
+        /// </summary>
+        void ToggleSanskrit()
+        {
+            AppSettings.NarrateSanskrit = !AppSettings.NarrateSanskrit;
+
+            // Tapping a speaker means "play this". If narration was stopped, start it.
+            AppSettings.AudioEnabled = true;
+            SpeakCurrent();
+            UpdateSanskritButton();
+            UpdateAudioButton();
+        }
+
+        void UpdateSanskritButton()
+        {
+            bool on = AppSettings.NarrateSanskrit;
+            if (_sanskritBg != null)
+                _sanskritBg.color = on ? Theme.Saffron.WithAlpha(0.28f)
+                                       : Theme.TwilightLit.WithAlpha(0.7f);
+            if (_sanskritIcon != null)
+                _sanskritIcon.color = on ? Theme.SaffronLit : Theme.Muted;
+            if (_sanskritLabel != null)
+                _sanskritLabel.color = on ? Theme.SaffronLit : Theme.Parchment;
+        }
         static void AddRule(Transform parent)
         {
             var host = UIKit.Node("Rule", parent);
@@ -217,7 +311,7 @@ namespace Gita.UI
 
         void BuildFooter()
         {
-            var footer = UIKit.Node("Footer", Root).BottomBand(0f, 150f);
+            var footer = UIKit.Node("Footer", Root).BottomBand(0f, 164f);
 
             var bg = UIKit.Panel("Bg", footer, Theme.NightDeep.WithAlpha(0.97f), UIKit.Solid);
             bg.rectTransform.Inset(0f, 0f, 0f, 0f);
@@ -227,6 +321,61 @@ namespace Gita.UI
 
             MakeNavButton(footer, "Prev", "← Previous", 0f, Previous);
             MakeNavButton(footer, "Next", "Next →", 1f, Next);
+            BuildAudioButton(footer);
+        }
+
+        /// <summary>
+        /// The single audio control, in the middle of the footer where a thumb lands.
+        ///
+        /// Playing stops it and leaves the rest of the reading silent; starting it
+        /// speaks this verse and lets the following ones speak themselves. One button,
+        /// one meaning - which is the whole point of merging it with what used to be a
+        /// separate mute.
+        /// </summary>
+        void BuildAudioButton(RectTransform footer)
+        {
+            var btn = UIKit.Tappable("Audio", footer, ToggleAudio, Theme.TwilightLit.WithAlpha(0.8f));
+            var rt = btn.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(150f, 104f);
+            rt.anchoredPosition = new Vector2(0f, 6f);
+            btn.image.sprite = UIKit.RoundedSoft;
+            _audioBg = btn.image;
+
+            // Play: a drawn triangle rather than a glyph, so nothing depends on which
+            // symbols happen to be in the bundled fonts.
+            _playIcon = UIKit.Raw("Play", btn.transform, Theme.Saffron, UIKit.Triangle);
+            var play = _playIcon.rectTransform;
+            play.anchorMin = play.anchorMax = new Vector2(0.5f, 0.5f);
+            play.pivot = new Vector2(0.5f, 0.5f);
+            play.sizeDelta = new Vector2(34f, 36f);
+            play.anchoredPosition = new Vector2(2f, 14f);
+
+            // Stop: two bars, built the same way.
+            _pauseIcon = UIKit.Node("Pause", btn.transform);
+            _pauseIcon.anchorMin = _pauseIcon.anchorMax = new Vector2(0.5f, 0.5f);
+            _pauseIcon.pivot = new Vector2(0.5f, 0.5f);
+            _pauseIcon.sizeDelta = new Vector2(34f, 36f);
+            _pauseIcon.anchoredPosition = new Vector2(0f, 14f);
+            Bar(_pauseIcon, -9f);
+            Bar(_pauseIcon, 9f);
+
+            _audioLabel = UIKit.Text("Label", btn.transform, "LISTEN",
+                Theme.SansBold, 19f, Theme.Parchment, TextAlignmentOptions.Bottom);
+            _audioLabel.rectTransform.Inset(0f, 0f, 0f, 12f);
+            _audioLabel.characterSpacing = 4f;
+            _audioLabel.Fit(0.6f);
+        }
+
+        static void Bar(RectTransform parent, float x)
+        {
+            var img = UIKit.Raw("Bar", parent, Theme.Saffron, UIKit.Solid);
+            var rt = img.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(10f, 34f);
+            rt.anchoredPosition = new Vector2(x, 0f);
         }
 
         void MakeNavButton(RectTransform parent, string name, string label, float anchorX,
@@ -236,13 +385,16 @@ namespace Gita.UI
             var rt = btn.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(anchorX, 0.5f);
             rt.pivot = new Vector2(anchorX, 0.5f);
-            rt.sizeDelta = new Vector2(320f, 96f);
+            rt.sizeDelta = new Vector2(280f, 104f);
             rt.anchoredPosition = new Vector2(anchorX == 0f ? Theme.Gutter : -Theme.Gutter, 0f);
 
             var text = UIKit.Text("Label", btn.transform, label,
-                Theme.SansBold, 24f, Theme.Cream, TextAlignmentOptions.Center);
-            text.rectTransform.Inset(0f, 0f, 0f, 0f);
-            text.characterSpacing = 3f;
+                Theme.SansBold, 27f, Theme.Cream,
+                anchorX == 0f ? TextAlignmentOptions.Left : TextAlignmentOptions.Right);
+            text.rectTransform.Inset(6f, 0f, 6f, 0f);
+            text.characterSpacing = 2f;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.Fit(0.55f);
         }
 
         // ------------------------------------------------------------------
@@ -251,7 +403,7 @@ namespace Gita.UI
 
         /// <summary>
         /// Works out which readings this language can offer, then lays out one chip per
-        /// reading plus a narrow speaker. Rebuilt whenever the language changes.
+        /// reading. Rebuilt whenever the language changes.
         /// </summary>
         void RebuildTabs()
         {
@@ -290,8 +442,7 @@ namespace Gita.UI
             _chipObjects.Clear();
 
             const float gap = 10f;
-            const float speakerWeight = 0.5f;   // the speaker chip is icon-only
-            float total = _tabs.Count + speakerWeight;
+            float total = _tabs.Count;
             float cursor = 0f;
 
             foreach (var spec in _tabs)
@@ -305,24 +456,15 @@ namespace Gita.UI
                 btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
 
                 var text = UIKit.Text("Label", btn.transform, spec.Label,
-                    Theme.Sans, _tabs.Count >= 4 ? 18f : 20f, Theme.Parchment,
+                    Theme.Sans, _tabs.Count >= 4 ? 22f : 25f, Theme.Parchment,
                     TextAlignmentOptions.Center);
                 text.rectTransform.Inset(4f, 0f, 4f, 0f);
                 text.overflowMode = TextOverflowModes.Ellipsis;
                 text.textWrappingMode = TextWrappingModes.NoWrap;
+                text.Fit(0.55f);
 
                 _chipObjects.Add(cell.gameObject);
             }
-
-            // Speak the verse now, whatever the auto-narration setting is.
-            var speakerCell = Cell(cursor, speakerWeight, total, gap);
-            var speaker = UIKit.Tappable("Listen", speakerCell, SpeakCurrent,
-                Theme.TwilightLit.WithAlpha(0.7f));
-            speaker.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
-            var glyph = UIKit.Text("Glyph", speaker.transform, "▶",
-                Theme.Sans, 22f, Theme.Saffron, TextAlignmentOptions.Center);
-            glyph.rectTransform.Inset(0f, 0f, 0f, 0f);
-            _chipObjects.Add(speakerCell.gameObject);
         }
 
         RectTransform Cell(float start, float weight, float total, float gap)
@@ -401,13 +543,35 @@ namespace Gita.UI
             Refresh(speak: false);
         }
 
-        void ToggleMute()
+        /// <summary>
+        /// The one audio control. If a verse is being read it stops, and the reading
+        /// stays silent from there; if nothing is being read it speaks this verse and
+        /// lets the following ones speak themselves.
+        /// </summary>
+        void ToggleAudio()
         {
-            AppSettings.AudioEnabled = !AppSettings.AudioEnabled;
-            if (!AppSettings.AudioEnabled) { Narration.Stop(); AudioSession.End(); }
-            else SpeakCurrent();
-            UpdateMuteButton();
+            if (AudioActive)
+            {
+                _speakAt = -99f;
+                AppSettings.AudioEnabled = false;
+                Narration.Stop();
+                AudioSession.End();
+            }
+            else
+            {
+                AppSettings.AudioEnabled = true;
+                SpeakCurrent();
+            }
+            UpdateAudioButton();
         }
+
+        /// <summary>
+        /// Whether a verse is actually being spoken. The engine takes a moment to start,
+        /// so a request counts as speaking for a second - otherwise the button flicks
+        /// back to play for a frame or two straight after being pressed.
+        /// </summary>
+        bool AudioActive =>
+            Narration.IsSpeaking || Time.unscaledTime - _speakAt < 1f;
 
         void ToggleBookmark()
         {
@@ -437,16 +601,52 @@ namespace Gita.UI
             VerseShare.Share(verse, ActiveEdition());
         }
 
-        void UpdateMuteButton()
+        /// <summary>
+        /// Shows stop while a verse is being read and play the rest of the time. The
+        /// label says which, because an icon alone is not enough on a control that has
+        /// just changed meaning.
+        /// </summary>
+        void UpdateAudioButton()
         {
-            bool on = AppSettings.AudioEnabled;
-            if (_muteGlyph != null)
+            bool active = AudioActive;
+
+            if (_playIcon != null) _playIcon.gameObject.SetActive(!active);
+            if (_pauseIcon != null) _pauseIcon.gameObject.SetActive(active);
+
+            if (_audioLabel != null)
             {
-                _muteGlyph.text = on ? "♪" : "✕";
-                _muteGlyph.color = on ? Theme.Saffron : Theme.Muted;
+                _audioLabel.text = active ? "STOP" : "LISTEN";
+                _audioLabel.color = active ? Theme.SaffronLit : Theme.Parchment;
             }
-            if (_muteBg != null)
-                _muteBg.color = on ? Theme.Saffron.WithAlpha(0.22f) : Theme.TwilightLit.WithAlpha(0.7f);
+            if (_audioBg != null)
+                _audioBg.color = active
+                    ? Theme.Saffron.WithAlpha(0.26f)
+                    : Theme.TwilightLit.WithAlpha(0.8f);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+            if (!IsVisible) return;
+
+            // Follows the mood through its crossfade, so the text never has to sit on a
+            // sky that has become too bright for it.
+            if (_scrim != null)
+            {
+                var mood = AppRoot.Instance?.Mood;
+                if (mood != null) _scrim.color = Theme.NightDeep.WithAlpha(mood.Scrim);
+            }
+
+            // The engine finishes on its own, and nothing tells us when. Poll slowly
+            // enough to cost nothing and often enough that the button never lies.
+            _audioPoll -= Time.unscaledDeltaTime;
+            if (_audioPoll > 0f) return;
+            _audioPoll = 0.25f;
+
+            bool active = AudioActive;
+            if (active == _wasActive) return;
+            _wasActive = active;
+            UpdateAudioButton();
         }
 
         /// <summary>The edition currently on screen, falling back to the chosen one.</summary>
@@ -462,16 +662,48 @@ namespace Gita.UI
             var verse = GitaDatabase.AtFlatIndex(_flatIndex);
             if (verse == null) return;
 
-            // Read whatever is on screen, in that edition's own language - switching to
-            // the Hindi tab should give a Hindi voice, not an English one.
-            int edition = ActiveEdition();
-            string text = GitaDatabase.TextOf(verse, edition, out edition);
+            string text;
+            string locale;
+            string voiceLang;
+
+            if (AppSettings.NarrateSanskrit)
+            {
+                // Android has no Sanskrit voice, so the shloka is read by a Hindi one -
+                // the only voice on the device that can pronounce the script at all.
+                text = verse.sa;
+                locale = AppSettings.SanskritTts;
+                voiceLang = AppSettings.SanskritVoiceLang;
+
+                // A verse with no Sanskrit on record should fall through to its meaning
+                // rather than leaving the page silent.
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    int fallbackEdition = ActiveEdition();
+                    text = GitaDatabase.TextOf(verse, fallbackEdition, out fallbackEdition);
+                    var fallbackRecord = GitaDatabase.EditionAt(fallbackEdition);
+                    locale = fallbackRecord?.tts ?? "en-IN";
+                    voiceLang = fallbackRecord?.lang;
+                }
+            }
+            else
+            {
+                // Read whatever is on screen, in that edition's own language - switching
+                // to the Hindi tab should give a Hindi voice, not an English one.
+                int edition = ActiveEdition();
+                text = GitaDatabase.TextOf(verse, edition, out edition);
+
+                // Use the edition the text actually came from, so a fallback is not read
+                // aloud in the wrong language's voice.
+                var record = GitaDatabase.EditionAt(edition);
+                locale = record?.tts ?? "en-IN";
+                voiceLang = record?.lang;
+            }
+
             if (string.IsNullOrWhiteSpace(text)) return;
 
-            // Use the edition the text actually came from, so a fallback is not read
-            // aloud in the wrong language's voice.
-            var record = GitaDatabase.EditionAt(edition);
-            Narration.Speak(text, record?.tts ?? "en-IN", AppSettings.SpeechRate);
+            Narration.Speak(text, locale, AppSettings.SpeechRate,
+                voiceName: AppSettings.VoiceFor(voiceLang));
+            _speakAt = Time.unscaledTime;
             AudioSession.Begin();   // hold the screen awake while a verse is read
         }
 
@@ -489,6 +721,10 @@ namespace Gita.UI
             _reference.text = $"{verse.c}.{verse.v}";
             _sanskrit.SetText(verse.sa);
             _translit.text = verse.tr;
+
+            // Dress the set for this verse: the light, the air and the framing all
+            // follow what the verse is about.
+            AppRoot.Instance?.Mood?.GoTo(verse.c, verse.v);
 
             bool wordByWord = _tab == Tab.WordByWord;
             int edition = ActiveEdition();
@@ -522,7 +758,8 @@ namespace Gita.UI
             }
 
             PaintChips();
-            UpdateMuteButton();
+            UpdateAudioButton();
+            UpdateSanskritButton();
             UpdateBookmarkButton();
 
             // Text length varies by an order of magnitude across the corpus, so the

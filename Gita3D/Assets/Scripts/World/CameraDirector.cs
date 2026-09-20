@@ -76,6 +76,20 @@ namespace Gita.World
 
         public Shot Current { get; private set; } = Shot.Establishing;
 
+        // A framing offset laid over the current shot, so the mood of a verse can move
+        // the lens without every mood needing a shot of its own. Eased rather than set,
+        // because a page turn should not snap the camera.
+        Vector3 _moodPos, _moodTarget, _moodPosWanted, _moodTargetWanted;
+        float _moodFov, _moodFovWanted;
+
+        /// <summary>Framing to hold on top of the current shot. Reached over about a second.</summary>
+        public void SetMoodFraming(Vector3 camOffset, Vector3 targetOffset, float fovDelta)
+        {
+            _moodPosWanted = camOffset;
+            _moodTargetWanted = targetOffset;
+            _moodFovWanted = fovDelta;
+        }
+
         public static CameraDirector Create(Camera cam)
         {
             var d = cam.gameObject.AddComponent<CameraDirector>();
@@ -115,6 +129,11 @@ namespace Gita.World
         {
             float dt = Time.deltaTime;
             _shotTime += dt;
+
+            float ease = 1f - Mathf.Exp(-dt * 2.2f);
+            _moodPos = Vector3.Lerp(_moodPos, _moodPosWanted, ease);
+            _moodTarget = Vector3.Lerp(_moodTarget, _moodTargetWanted, ease);
+            _moodFov = Mathf.Lerp(_moodFov, _moodFovWanted, ease);
             if (_blend < 1f) _blend = Mathf.Min(1f, _blend + dt * _blendSpeed);
             Apply(_blend);
         }
@@ -139,6 +158,9 @@ namespace Gita.World
         void Apply(float blend)
         {
             var s = Sample(blend);
+            s.position += _moodPos;
+            s.target += _moodTarget;
+            s.fov += _moodFov;
             var pos = s.position;
 
             // Slow arc around the subject - a handful of degrees over a minute.

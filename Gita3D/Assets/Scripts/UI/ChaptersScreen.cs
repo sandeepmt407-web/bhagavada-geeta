@@ -11,8 +11,15 @@ namespace Gita.UI
     {
         public override Shot CameraShot => Shot.Chapters;
 
-        const float CardHeight = 206f;
+        const float CardHeightBase = 224f;
         const float CardGap = 18f;
+
+        /// <summary>Cards get taller with the reader's text size; the list just scrolls further.</summary>
+        static float CardHeight => Theme.Scaled(CardHeightBase);
+
+        RectTransform _content;
+        readonly System.Collections.Generic.List<GameObject> _cards = new();
+        float _laidOutAt = -1f;
 
         public override void Build(RectTransform parent)
         {
@@ -68,17 +75,8 @@ namespace Gita.UI
             content.offsetMin = Vector2.zero;
             content.offsetMax = Vector2.zero;
 
-            var chapters = GitaDatabase.Chapters;
-            float y = Theme.GapL;
-
-            foreach (var ch in chapters)
-            {
-                BuildCard(content, ch, y);
-                y += CardHeight + CardGap;
-            }
-            y += Theme.GapL * 2f; // breathing room at the end of the scroll
-
-            content.sizeDelta = new Vector2(0f, y);
+            _content = content;
+            LayOutCards();
 
             var scroll = viewport.gameObject.AddComponent<ScrollRect>();
             scroll.content = content;
@@ -92,7 +90,37 @@ namespace Gita.UI
             scroll.scrollSensitivity = 28f;
         }
 
-        void BuildCard(RectTransform parent, Chapter ch, float top)
+
+        /// <summary>
+        /// Positions the eighteen cards. Rebuilt rather than resized when the reader
+        /// changes text size: the cards grow with the type, so every position after the
+        /// first one moves.
+        /// </summary>
+        void LayOutCards()
+        {
+            if (_content == null) return;
+
+            foreach (var go in _cards) if (go != null) Destroy(go);
+            _cards.Clear();
+
+            float y = Theme.GapL;
+            foreach (var ch in GitaDatabase.Chapters)
+            {
+                _cards.Add(BuildCard(_content, ch, y));
+                y += CardHeight + CardGap;
+            }
+            y += Theme.GapL * 2f;   // breathing room at the end of the scroll
+
+            _content.sizeDelta = new Vector2(0f, y);
+            _laidOutAt = Theme.TextScale;
+        }
+
+        public override void OnShow()
+        {
+            // Only worth the rebuild if the type has actually changed since last time.
+            if (!Mathf.Approximately(_laidOutAt, Theme.TextScale)) LayOutCards();
+        }
+        GameObject BuildCard(RectTransform parent, Chapter ch, float top)
         {
             var card = UIKit.Node($"Ch{ch.number}", parent);
             card.anchorMin = new Vector2(0f, 1f);
@@ -115,44 +143,51 @@ namespace Gita.UI
             // Chapter number, set large in the left margin.
             var num = UIKit.Text("Num", body, ch.number.ToString("00"),
                 Theme.Serif, 62f, Theme.Saffron.WithAlpha(0.85f), TextAlignmentOptions.Center);
+            num.Fit(0.6f);
             num.rectTransform.anchorMin = new Vector2(0f, 0.5f);
             num.rectTransform.anchorMax = new Vector2(0f, 0.5f);
             num.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             num.rectTransform.sizeDelta = new Vector2(120f, 90f);
-            num.rectTransform.anchoredPosition = new Vector2(84f, 6f);
+            num.rectTransform.anchoredPosition = new Vector2(84f, Theme.Scaled(6f));
 
             var count = UIKit.Text("Count", body, $"{ch.verseCount} verses",
-                Theme.Sans, 19f, Theme.Muted, TextAlignmentOptions.Center);
+                Theme.Sans, 23f, Theme.Muted, TextAlignmentOptions.Center);
             count.rectTransform.anchorMin = new Vector2(0f, 0.5f);
             count.rectTransform.anchorMax = new Vector2(0f, 0.5f);
             count.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             count.rectTransform.sizeDelta = new Vector2(140f, 30f);
-            count.rectTransform.anchoredPosition = new Vector2(84f, -46f);
+            count.rectTransform.anchoredPosition = new Vector2(84f, Theme.Scaled(-46f));
+            count.textWrappingMode = TextWrappingModes.NoWrap;
+            count.Fit(0.55f);
 
             // Titles, stacked to the right of the number.
             const float textLeft = 168f;
 
             var devanagari = ShapedText.Create("Sa", body,
-                Theme.Devanagari, NativeText.SerifDevanagari, 34f,
+                Theme.Devanagari, NativeText.SerifDevanagari, 40f,
                 Theme.Cream, NativeText.AlignStart);
             var devRt = (RectTransform)devanagari.transform;
-            devRt.TopBand(26f, 48f, 0f);
+            devRt.TopBand(Theme.Scaled(24f), Theme.Scaled(56f), 0f);
             devRt.offsetMin = new Vector2(textLeft, devRt.offsetMin.y);
             devRt.offsetMax = new Vector2(-28f, devRt.offsetMax.y);
+            devanagari.SetMaxHeightRef(Theme.Scaled(56f));
             devanagari.SetText(ch.name);
 
             var translit = UIKit.Text("Tr", body, ch.translit,
-                Theme.Serif, 27f, Theme.Saffron.WithAlpha(0.9f), TextAlignmentOptions.TopLeft);
-            translit.rectTransform.TopBand(80f, 40f, 0f);
+                Theme.Serif, 32f, Theme.Saffron.WithAlpha(0.9f), TextAlignmentOptions.TopLeft);
+            translit.rectTransform.TopBand(Theme.Scaled(86f), Theme.Scaled(46f), 0f);
             translit.rectTransform.offsetMin = new Vector2(textLeft, translit.rectTransform.offsetMin.y);
             translit.rectTransform.offsetMax = new Vector2(-28f, translit.rectTransform.offsetMax.y);
+            translit.textWrappingMode = TextWrappingModes.NoWrap;
+            translit.Fit(0.55f);
 
             var meaning = UIKit.Text("En", body, ch.meaning,
-                Theme.Sans, 23f, Theme.Parchment.WithAlpha(0.85f), TextAlignmentOptions.TopLeft);
-            meaning.rectTransform.TopBand(126f, 56f, 0f);
+                Theme.Sans, 27f, Theme.Parchment.WithAlpha(0.85f), TextAlignmentOptions.TopLeft);
+            meaning.rectTransform.TopBand(Theme.Scaled(140f), Theme.Scaled(66f), 0f);
             meaning.rectTransform.offsetMin = new Vector2(textLeft, meaning.rectTransform.offsetMin.y);
             meaning.rectTransform.offsetMax = new Vector2(-28f, meaning.rectTransform.offsetMax.y);
             meaning.overflowMode = TextOverflowModes.Ellipsis;
+            meaning.Fit(0.6f);
 
             // Hairline separating the number column from the titles.
             var divider = UIKit.Panel("Div", body, Theme.Saffron.WithAlpha(0.18f), UIKit.Solid);
@@ -161,6 +196,8 @@ namespace Gita.UI
             divider.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             divider.rectTransform.sizeDelta = new Vector2(1.5f, CardHeight - 64f);
             divider.rectTransform.anchoredPosition = new Vector2(150f, 0f);
+
+            return card.gameObject;
         }
     }
 }

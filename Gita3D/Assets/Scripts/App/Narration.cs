@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Gita.App
@@ -51,6 +52,25 @@ namespace Gita.App
             }
         }
 
+
+        /// <summary>
+        /// The voice the engine settled on, empty when unknown. Shown on the settings
+        /// screen: it is the one piece of evidence a reader has about why narration
+        /// sounds the way it does, and which voice to replace if they want better.
+        /// </summary>
+        public static string VoiceName
+        {
+            get
+            {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                if (_unavailable || _narrator == null) return "";
+                try { return _narrator.CallStatic<string>("voiceName") ?? ""; }
+                catch { return ""; }
+#else
+                return "";
+#endif
+            }
+        }
         /// <summary>Starts the engine. Safe to call more than once; returns immediately.</summary>
         public static void Init()
         {
@@ -83,8 +103,106 @@ namespace Gita.App
 #endif
         }
 
+
+        /// <summary>One voice the device can speak with.</summary>
+        public readonly struct VoiceOption
+        {
+            public readonly string Name;      // engine identifier, e.g. en-in-x-ahp-local
+            public readonly string Locale;    // en_IN
+            public readonly int Quality;      // 100 very low .. 500 very high
+            public readonly bool NeedsNetwork;
+
+            public VoiceOption(string name, string locale, int quality, bool needsNetwork)
+            {
+                Name = name; Locale = locale; Quality = quality; NeedsNetwork = needsNetwork;
+            }
+
+            /// <summary>
+            /// A name a reader can choose between. The engine's own identifiers are
+            /// things like "en-in-x-ahp-local", which say nothing to anyone, so they are
+            /// numbered and described by what actually distinguishes them.
+            /// </summary>
+            public string Describe(int index)
+            {
+                string grade = Quality >= 500 ? "Very high quality"
+                             : Quality >= 400 ? "High quality"
+                             : Quality >= 300 ? "Standard quality"
+                             : "Basic quality";
+                return $"Voice {index + 1}  ·  {grade}";
+            }
+
+            public string Detail => NeedsNetwork
+                ? "Needs a connection"
+                : "Works offline";
+        }
+
+        /// <summary>
+        /// The voices installed on this device for a language.
+        ///
+        /// There is no published list of what any given phone carries - it depends on
+        /// the engine, the Android version and which voice data the owner installed - so
+        /// this asks the device rather than assuming. With <paramref name="indiaOnly"/>
+        /// the list is narrowed to India-locale voices, and falls back to the language's
+        /// other voices if the device has none.
+        /// </summary>
+        public static List<VoiceOption> Voices(string localeTag, bool indiaOnly = true)
+        {
+            var list = new List<VoiceOption>();
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (_unavailable || _narrator == null) return list;
+            try
+            {
+                string raw = _narrator.CallStatic<string>("listVoices", localeTag ?? "", indiaOnly);
+                Parse(raw, list);
+
+                // A language with no India-locale voice on this device would otherwise
+                // offer nothing at all, which is worse than offering what it has.
+                if (list.Count == 0 && indiaOnly)
+                {
+                    raw = _narrator.CallStatic<string>("listVoices", localeTag ?? "", false);
+                    Parse(raw, list);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Gita] Could not list voices: {e.Message}");
+            }
+#endif
+            return list;
+        }
+
+        static void Parse(string raw, List<VoiceOption> into)
+        {
+            if (string.IsNullOrEmpty(raw)) return;
+
+            foreach (var line in raw.Split('\n'))
+            {
+                var f = line.Split('|');
+                if (f.Length < 4) continue;
+                int.TryParse(f[2], out int quality);
+                into.Add(new VoiceOption(f[0], f[1], quality, f[3] == "1"));
+            }
+
+            // Best first: quality descending, and offline ahead of network at equal
+            // quality, because a voice that fails without signal is not really a choice.
+            into.Sort((a, b) =>
+            {
+                int byQuality = b.Quality.CompareTo(a.Quality);
+                if (byQuality != 0) return byQuality;
+                int byNetwork = a.NeedsNetwork.CompareTo(b.NeedsNetwork);
+                if (byNetwork != 0) return byNetwork;
+                return string.CompareOrdinal(a.Name, b.Name);
+            });
+        }
         /// <summary>Speaks text, cutting off whatever is currently being spoken.</summary>
-        public static void Speak(string text, string locale, float rate = 0.85f, float pitch = 1f)
+        /// <remarks>
+        /// The pitch sits slightly below the engine default. Most Android voices are
+        /// tuned bright for navigation prompts, which is the wrong register for this
+        /// text; a few per cent down reads as measured rather than as chirpy.
+        /// </remarks>
+        public static void Speak(string text, string locale, float rate = 0.88f, float pitch = 0.96f,
+            string voiceName = null)
         {
             if (string.IsNullOrWhiteSpace(text)) return;
 
@@ -95,7 +213,7 @@ namespace Gita.App
                 // Very long passages make some engines fail outright; the book view can
                 // hand over a whole chapter, so cap it and let the caller chunk.
                 if (text.Length > 3800) text = text.Substring(0, 3800);
-                _narrator.CallStatic("speak", text, locale ?? "en-IN", rate, pitch);
+                _narrator.CallStatic("speak", text, locale ?? "en-IN", rate, pitch, voiceName ?? "");
             }
             catch (Exception e)
             {

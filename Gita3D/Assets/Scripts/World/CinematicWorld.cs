@@ -20,6 +20,15 @@ namespace Gita.World
         public Transform Chariot { get; private set; }
         public Light Sun { get; private set; }
 
+        /// <summary>The cool counter-light. The mood director re-colours it per verse.</summary>
+        public Light Fill { get; private set; }
+
+        /// <summary>The battlefield haze. Replaced by the mood director's own motif layers.</summary>
+        public ParticleSystem Dust { get; private set; }
+
+        /// <summary>Shared additive material, reused by every motif layer.</summary>
+        public Material DustMaterial => _dust;
+
         readonly List<Material> _owned = new();
 
         Material _silhouette, _silhouetteFlat, _ground, _cloth, _glow, _dust;
@@ -104,7 +113,7 @@ namespace Gita.World
             var fillGo = new GameObject("Fill");
             fillGo.transform.SetParent(transform, false);
             fillGo.transform.rotation = Quaternion.Euler(28f, 190f, 0f);
-            var fill = fillGo.AddComponent<Light>();
+            var fill = Fill = fillGo.AddComponent<Light>();
             fill.type = LightType.Directional;
             fill.color = new Color(0.42f, 0.53f, 0.82f);
             fill.intensity = 0.30f;
@@ -547,7 +556,7 @@ namespace Gita.World
             go.transform.SetParent(transform, false);
             go.transform.position = new Vector3(0f, 6f, 22f);
 
-            var ps = go.AddComponent<ParticleSystem>();
+            var ps = Dust = go.AddComponent<ParticleSystem>();
             var main = ps.main;
             main.loop = true;
             main.startLifetime = 26f;

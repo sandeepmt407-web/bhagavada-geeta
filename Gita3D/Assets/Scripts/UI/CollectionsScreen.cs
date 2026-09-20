@@ -56,8 +56,8 @@ namespace Gita.UI
         {
             var host = UIKit.Node(theme.Name, Content);
             var el = host.gameObject.AddComponent<LayoutElement>();
-            el.preferredHeight = 128f;
-            el.minHeight = 128f;
+            el.preferredHeight = Theme.Scaled(146f);
+            el.minHeight = el.preferredHeight;
 
             var captured = theme;
             var btn = UIKit.Tappable("Tap", host, () => Open(captured),
@@ -65,15 +65,21 @@ namespace Gita.UI
             btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
 
             var name = UIKit.Text("Name", btn.transform, theme.Name,
-                Theme.Serif, 29f, Theme.Cream, TextAlignmentOptions.TopLeft);
-            name.rectTransform.TopBand(26f, 40f, 30f);
+                Theme.Serif, 34f, Theme.Cream, TextAlignmentOptions.TopLeft);
+            name.rectTransform.TopBand(Theme.Scaled(24f), Theme.Scaled(46f), 30f);
+            name.textWrappingMode = TextWrappingModes.NoWrap;
+            name.overflowMode = TextOverflowModes.Ellipsis;
+            name.Fit(0.6f);
 
             var blurb = UIKit.Text("Blurb", btn.transform, theme.Blurb,
-                Theme.Sans, 21f, Theme.Muted, TextAlignmentOptions.TopLeft);
-            blurb.rectTransform.TopBand(70f, 34f, 30f);
+                Theme.Sans, 25f, Theme.Muted, TextAlignmentOptions.TopLeft);
+            blurb.rectTransform.TopBand(Theme.Scaled(78f), Theme.Scaled(40f), 30f);
+            blurb.textWrappingMode = TextWrappingModes.NoWrap;
+            blurb.overflowMode = TextOverflowModes.Ellipsis;
+            blurb.Fit(0.6f);
 
             var count = UIKit.Text("Count", btn.transform, theme.Verses.Length.ToString(),
-                Theme.SansBold, 30f, Theme.Saffron.WithAlpha(0.8f), TextAlignmentOptions.Center);
+                Theme.SansBold, 34f, Theme.Saffron.WithAlpha(0.8f), TextAlignmentOptions.Center);
             var rt = count.rectTransform;
             rt.anchorMin = rt.anchorMax = new Vector2(1f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);

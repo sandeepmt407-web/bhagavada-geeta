@@ -30,10 +30,51 @@ namespace Gita.EditorTools
             IncludeRuntimeShaders();
             ConfigurePlayer();
             ConfigureIconsAndSplash();
+            ConfigureAudio();
             CreateScene();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("[Config] Project configured.");
+        }
+
+
+        // ------------------------------------------------------------------
+        // audio
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Import settings for the ambience bed.
+        ///
+        /// It is a minute and a half long and plays for as long as the app is open, so
+        /// it streams from disk rather than being decompressed into memory at load -
+        /// the default would hold about four megabytes of PCM for a clip nothing ever
+        /// needs at sample accuracy. Mono, because it is a bed and not a place.
+        /// </summary>
+        public static void ConfigureAudio()
+        {
+            const string path = "Assets/Resources/Audio/bansuri-ambience.ogg";
+
+            var importer = AssetImporter.GetAtPath(path) as AudioImporter;
+            if (importer == null)
+            {
+                Debug.LogWarning($"[Config] No audio importer at {path} - skipping.");
+                return;
+            }
+
+            var settings = importer.defaultSampleSettings;
+            settings.loadType = AudioClipLoadType.Streaming;
+            settings.compressionFormat = AudioCompressionFormat.Vorbis;
+            settings.quality = 0.55f;
+            // Preloading is a per-platform sample setting now, not a property on the
+            // importer; a streamed clip should not be preloaded in any case.
+            settings.preloadAudioData = false;
+            importer.defaultSampleSettings = settings;
+
+            importer.forceToMono = true;
+            importer.loadInBackground = true;
+
+            importer.SaveAndReimport();
+            Debug.Log("[Config] Audio configured.");
         }
 
         // ------------------------------------------------------------------
@@ -170,8 +211,12 @@ namespace Gita.EditorTools
         public static void ConfigurePlayer()
         {
             PlayerSettings.companyName = "Sanatan Studios";
-            PlayerSettings.productName = "Bhagavad Gita 3D";
-            PlayerSettings.applicationIdentifier = "com.sanatan.bhagavadgita3d";
+            PlayerSettings.productName = "Bhagavad Gita";
+
+            // Set explicitly for Android rather than through the ambient
+            // applicationIdentifier, which only applies to the active build target.
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android,
+                "com.theops.bhagvadgeeta");
             PlayerSettings.bundleVersion = "1.0.0";
             PlayerSettings.Android.bundleVersionCode = 1;
 

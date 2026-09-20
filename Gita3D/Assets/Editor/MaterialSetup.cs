@@ -102,10 +102,21 @@ namespace Gita.EditorTools
             }
 
             // Transparent, additive.
+            //
+            // _Blend is URP's own preset enum (0 alpha, 1 premultiply, 2 additive,
+            // 3 multiply) and URP re-derives _SrcBlend and _DstBlend from it whenever
+            // the material is validated. Setting the blend factors by hand and leaving
+            // _Blend at premultiply meant URP quietly overwrote them with One /
+            // OneMinusSrcAlpha - and against a texture whose colour is white everywhere
+            // and whose shape lives entirely in its alpha, that renders the whole quad
+            // opaque. That is where the hard bright squares came from. The preset is
+            // what has to be set; the factors follow from it.
             m.SetFloat("_Surface", 1f);
-            m.SetFloat("_Blend", 1f);
+            m.SetFloat("_Blend", 2f);   // additive
             m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
             m.SetFloat("_DstBlend", (float)BlendMode.One);
+            m.SetFloat("_SrcBlendAlpha", (float)BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlendAlpha", (float)BlendMode.One);
             m.SetFloat("_ZWrite", 0f);
             m.SetFloat("_AlphaClip", 0f);
             m.SetOverrideTag("RenderType", "Transparent");

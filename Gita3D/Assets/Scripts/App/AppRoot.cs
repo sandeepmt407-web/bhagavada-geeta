@@ -22,6 +22,7 @@ namespace Gita.App
         public CameraDirector Director { get; private set; }
         public CinematicWorld World { get; private set; }
         public PostFX Grade { get; private set; }
+        public MoodDirector Mood { get; private set; }
         public Canvas Canvas { get; private set; }
 
         ReaderScreen _reader;
@@ -42,13 +43,16 @@ namespace Gita.App
             AppSettings.Validate();
             AppSettings.ApplyDeviceDefault();
             Theme.LoadFonts();
+            AppSettings.ApplyTextScale();
             Narration.Init();
             DailyVerse.Apply();
+            Ambience.Create(transform);
 
             var cam = BuildCamera();
             World = CinematicWorld.Create();
             Director = CameraDirector.Create(cam);
             Grade = PostFX.Create(Director);
+            Mood = MoodDirector.Create(World, Director, Grade);
 
             ApplyDeviceTier();
             BuildInterface();
@@ -63,8 +67,89 @@ namespace Gita.App
             // A tap on the daily notification opens straight to that verse.
             var invited = DailyVerse.OpenedFromNotification();
             if (invited != null) OpenVerse(invited.c, invited.v);
+
+            ApplyCommandLine();
         }
 
+
+        /// <summary>
+        /// Opens straight to a verse when started with "-gita-verse 11.12", and takes
+        /// "-gita-screen Reader", "-gita-textsize 3" and "-gita-shot out.png" alongside it.
+        ///
+        /// This exists for the desktop preview build, which is how the layout gets
+        /// looked at without a handset: without it every inspection means clicking
+        /// through Home and the chapter list first. Android never passes command-line
+        /// arguments, so it is inert in the shipped app.
+        /// </summary>
+        void ApplyCommandLine()
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (args[i] != "-gita-verse") continue;
+
+                var parts = args[i + 1].Split('.');
+                if (parts.Length != 2) break;
+                if (!int.TryParse(parts[0], out int chapter)) break;
+                if (!int.TryParse(parts[1], out int verse)) break;
+
+                OpenVerse(chapter, verse);
+                break;
+            }
+
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (args[i] != "-gita-textsize") continue;
+                if (int.TryParse(args[i + 1], out int step) &&
+                    step >= 0 && step < AppSettings.TextSizes.Length)
+                {
+                    AppSettings.TextScale = AppSettings.TextSizes[step].scale;
+                }
+                break;
+            }
+
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (args[i] != "-gita-screen") continue;
+                if (System.Enum.TryParse(args[i + 1], ignoreCase: true, out ScreenId screen))
+                    GoTo(screen);
+                break;
+            }
+
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (args[i] != "-gita-shot") continue;
+                StartCoroutine(CaptureAndQuit(args[i + 1], 6f));
+                break;
+            }
+        }
+
+        /// <summary>
+        /// Writes a screenshot and exits, for "-gita-shot out.png".
+        ///
+        /// Grabbing the window from outside gets the wrong pixels on a scaled display;
+        /// asking the app itself gives exactly what it drew. Same reasoning as the verse
+        /// argument above, and equally inert on a handset.
+        /// </summary>
+        System.Collections.IEnumerator CaptureAndQuit(string path, float settle)
+        {
+            // Long enough for the mood crossfade and the first layout pass to finish.
+            yield return new WaitForSecondsRealtime(settle);
+
+            // Read the framebuffer directly rather than through ScreenCapture: that
+            // module is not in the project, and pulling it in would add to the shipped
+            // app for the sake of a development convenience.
+            yield return new WaitForEndOfFrame();
+
+            var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0f, 0f, Screen.width, Screen.height), 0, 0);
+            tex.Apply();
+            System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+            Destroy(tex);
+
+            yield return null;
+            Application.Quit();
+        }
         static void ConfigureRuntime()
         {
             Application.targetFrameRate = 60;
@@ -135,13 +220,14 @@ namespace Gita.App
                 es.AddComponent<StandaloneInputModule>();
             }
 
-            // Everything sits inside the safe area, clear of notches and the gesture bar.
+            // Everything sits clear of the notch and of the navigation bar. Unity's own
+            // SafeArea component was doing this from Screen.safeArea alone, which did not
+            // account for the gesture strip here - the footer of the reader ended up
+            // underneath the phone's back control.
             var safe = UIKit.Node("SafeArea", canvasGo.transform);
-            var safeArea = safe.gameObject.AddComponent<UnityEngine.UI.SafeArea>();
-            safeArea.Edges = UnityEngine.UI.SafeArea.SafeAreaMode.Top
-                           | UnityEngine.UI.SafeArea.SafeAreaMode.Bottom
-                           | UnityEngine.UI.SafeArea.SafeAreaMode.Left
-                           | UnityEngine.UI.SafeArea.SafeAreaMode.Right;
+            var fitter = SafeAreaFitter.Attach(safe);
+            SystemBarScrim.Create((RectTransform)canvasGo.transform, fitter,
+                Theme.NightDeep.WithAlpha(0.9f));
 
             Add<HomeScreen>(ScreenId.Home, safe);
             Add<ChaptersScreen>(ScreenId.Chapters, safe);

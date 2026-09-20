@@ -22,14 +22,44 @@ namespace Gita.UI
         public static readonly Color Scrim       = new(0.04f, 0.06f, 0.15f, 0.82f);
 
         // ---- type scale (reference resolution 1080 x 1920) --------------
-        public const float SizeDisplay = 64f;
-        public const float SizeTitle   = 44f;
-        public const float SizeHeading = 34f;
-        public const float SizeVerseSa = 40f; // Devanagari needs more height
-        public const float SizeBody    = 30f;
-        public const float SizeLabel   = 25f;
-        public const float SizeCaption = 22f;
+        // Raised across the board after reading the app on a phone: the old scale was
+        // drawn to look elegant in a screenshot and was genuinely hard to read in the
+        // hand. Body text now lands around 16sp on a typical 1080p handset, which is
+        // what the rest of Android uses for running text.
+        public const float SizeDisplay = 74f;
+        public const float SizeTitle   = 52f;
+        public const float SizeHeading = 40f;
+        public const float SizeVerseSa = 52f; // Devanagari needs more height
+        public const float SizeBody    = 40f;
+        public const float SizeLabel   = 30f;
+        public const float SizeCaption = 26f;
 
+        // ---- reader-adjustable size -------------------------------------
+
+        /// <summary>
+        /// Multiplies every authored size. Driven by the reader's text-size setting;
+        /// 1 is the scale above, which is the default.
+        /// </summary>
+        public static float TextScale { get; private set; } = 1f;
+
+        public static void SetTextScale(float scale)
+        {
+            float clamped = Mathf.Clamp(scale, 0.85f, 1.6f);
+            if (Mathf.Approximately(clamped, TextScale)) return;
+            TextScale = clamped;
+            ScaledText.ApplyScaleToAll();
+        }
+
+
+        /// <summary>
+        /// A vertical measurement that grows with the reader's text size.
+        ///
+        /// Used for the height of rows and cards inside scrolling lists. Those can
+        /// afford to get taller - the list simply becomes longer and scrolls further -
+        /// which keeps the text at the size the reader asked for instead of shrinking it
+        /// back down to fit a box that was sized for someone else.
+        /// </summary>
+        public static float Scaled(float v) => v * TextScale;
         // ---- spacing ----------------------------------------------------
         public const float Gutter = 48f;
         public const float GapS   = 12f;

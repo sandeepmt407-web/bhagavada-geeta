@@ -15,8 +15,8 @@ namespace Gita.EditorTools
     public static class GitaBuild
     {
         const string OutDir = "../build";
-        const string ApkName = "BhagavadGita3D.apk";
-        const string AabName = "BhagavadGita3D.aab";
+        const string ApkName = "BhagavadGita.apk";
+        const string AabName = "BhagavadGita.aab";
 
         [MenuItem("Gita/Build/APK")]
         public static void BuildAPK() => Build(appBundle: false);
@@ -35,7 +35,7 @@ namespace Gita.EditorTools
         {
             const string outDir = "../build/windows";
             Directory.CreateDirectory(outDir);
-            string output = Path.GetFullPath(Path.Combine(outDir, "BhagavadGita3D.exe"));
+            string output = Path.GetFullPath(Path.Combine(outDir, "BhagavadGita.exe"));
 
             // A tall window, so the portrait layout is laid out as it is on a phone.
             PlayerSettings.defaultScreenWidth = 540;
