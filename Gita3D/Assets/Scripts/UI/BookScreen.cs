@@ -344,6 +344,7 @@ namespace Gita.UI
             if (index < 0 || index >= _paragraphs.Count) { StopNarration(); return; }
 
             _playing = true;
+            AudioSession.Begin();
             SpeakParagraph(index);
             UpdatePlayButton();
         }
@@ -376,6 +377,7 @@ namespace Gita.UI
         void StopNarration()
         {
             _playing = false;
+            AudioSession.End();
             Narration.Stop();
             if (_speakingIndex >= 0 && _speakingIndex < _paragraphs.Count)
                 _paragraphs[_speakingIndex].Tint(Theme.Parchment);

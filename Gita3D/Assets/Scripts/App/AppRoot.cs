@@ -9,7 +9,7 @@ using Gita.World;
 
 namespace Gita.App
 {
-    public enum ScreenId { Home, Chapters, Reader, Book, Language }
+    public enum ScreenId { Home, Chapters, Reader, Book, Language, Search, Bookmarks, Collections }
 
     /// <summary>
     /// Single entry point. Builds the world, the camera and the interface at runtime,
@@ -44,6 +44,7 @@ namespace Gita.App
             AppSettings.ApplyDeviceDefault();
             Theme.LoadFonts();
             Narration.Init();
+            DailyVerse.Apply();
 
             var cam = BuildCamera();
             World = CinematicWorld.Create();
@@ -56,7 +57,11 @@ namespace Gita.App
             // Home is always the bottom of the stack. On a first run the language
             // choice is put in front of it, so the reader starts in their own language.
             GoTo(ScreenId.Home, pushHistory: false, fade: 0.8f);
-            if (!AppSettings.HasChosenLanguage)
+
+            // A tap on the daily notification opens straight to that verse.
+            var invited = DailyVerse.OpenedFromNotification();
+            if (invited != null) OpenVerse(invited.c, invited.v);
+            else if (!AppSettings.HasChosenLanguage)
                 GoTo(ScreenId.Language, pushHistory: true, fade: 0.6f);
         }
 
@@ -143,6 +148,9 @@ namespace Gita.App
             _reader = Add<ReaderScreen>(ScreenId.Reader, safe);
             _book = Add<BookScreen>(ScreenId.Book, safe);
             Add<LanguageScreen>(ScreenId.Language, safe);
+            Add<SearchScreen>(ScreenId.Search, safe);
+            Add<BookmarksScreen>(ScreenId.Bookmarks, safe);
+            Add<CollectionsScreen>(ScreenId.Collections, safe);
         }
 
         T Add<T>(ScreenId id, RectTransform parent) where T : ScreenBase

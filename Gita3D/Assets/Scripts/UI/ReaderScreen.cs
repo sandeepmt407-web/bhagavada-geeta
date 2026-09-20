@@ -40,8 +40,8 @@ namespace Gita.UI
         Tab _tab = Tab.Translation;
 
         TextMeshProUGUI _chapterTitle, _position, _reference, _translit, _body, _attribution;
-        TextMeshProUGUI _muteGlyph;
-        Image _muteBg;
+        TextMeshProUGUI _muteGlyph, _bookmarkGlyph;
+        Image _muteBg, _bookmarkBg;
         ShapedText _sanskrit, _bodyDevanagari;
         RectTransform _content, _chipBar;
         ScrollRect _scroll;
@@ -82,31 +82,50 @@ namespace Gita.UI
                 Theme.Sans, 44f, Theme.Cream, TextAlignmentOptions.Center);
             arrow.rectTransform.Inset(0f, 0f, 0f, 0f);
 
-            // Mute lives here rather than in a menu: it is the control most likely to be
-            // wanted in a hurry, and it stays reachable on every verse.
-            var mute = UIKit.Tappable("Mute", header, ToggleMute, Theme.TwilightLit.WithAlpha(0.7f));
-            var muteRt = mute.GetComponent<RectTransform>();
-            muteRt.anchorMin = muteRt.anchorMax = new Vector2(1f, 1f);
-            muteRt.pivot = new Vector2(0.5f, 0.5f);
-            muteRt.sizeDelta = new Vector2(96f, 84f);
-            muteRt.anchoredPosition = new Vector2(-Theme.Gutter - 48f, -106f);
+            // Three actions on the right, in order of how often they are wanted:
+            // mute nearest the thumb, then share, then the bookmark.
+            var mute = HeaderButton(header, "Mute", 42f, ToggleMute);
             _muteBg = mute.image;
             _muteGlyph = UIKit.Text("Glyph", mute.transform, "",
-                Theme.Sans, 34f, Theme.Cream, TextAlignmentOptions.Center);
+                Theme.Sans, 32f, Theme.Cream, TextAlignmentOptions.Center);
             _muteGlyph.rectTransform.Inset(0f, 0f, 0f, 0f);
 
+            var share = HeaderButton(header, "Share", 130f, ShareCurrent);
+            var shareGlyph = UIKit.Text("Glyph", share.transform, "↗",
+                Theme.Sans, 32f, Theme.Cream, TextAlignmentOptions.Center);
+            shareGlyph.rectTransform.Inset(0f, 0f, 0f, 0f);
+
+            var mark = HeaderButton(header, "Bookmark", 218f, ToggleBookmark);
+            _bookmarkBg = mark.image;
+            _bookmarkGlyph = UIKit.Text("Glyph", mark.transform, "",
+                Theme.Sans, 30f, Theme.Cream, TextAlignmentOptions.Center);
+            _bookmarkGlyph.rectTransform.Inset(0f, 0f, 0f, 0f);
+
             _chapterTitle = UIKit.Text("Chapter", header, "",
-                Theme.Serif, 30f, Theme.Cream, TextAlignmentOptions.Center);
-            _chapterTitle.rectTransform.TopBand(64f, 42f, Theme.Gutter + 150f);
+                Theme.Serif, 29f, Theme.Cream, TextAlignmentOptions.Center);
+            _chapterTitle.rectTransform.TopBand(64f, 42f, Theme.Gutter + 272f);
             _chapterTitle.overflowMode = TextOverflowModes.Ellipsis;
 
             _position = UIKit.Text("Position", header, "",
-                Theme.Sans, 21f, Theme.Muted, TextAlignmentOptions.Center);
-            _position.rectTransform.TopBand(110f, 32f, Theme.Gutter + 150f);
-            _position.characterSpacing = 4f;
+                Theme.Sans, 20f, Theme.Muted, TextAlignmentOptions.Center);
+            _position.rectTransform.TopBand(110f, 32f, Theme.Gutter + 272f);
+            _position.characterSpacing = 3f;
 
             var rule = UIKit.Panel("Rule", header, Theme.Saffron.WithAlpha(0.35f), UIKit.Solid);
             rule.rectTransform.BottomBand(0f, 2f);
+        }
+
+        /// <summary>An icon button in the header, measured in from the right edge.</summary>
+        static Button HeaderButton(RectTransform header, string name, float inset,
+            System.Action onTap)
+        {
+            var btn = UIKit.Tappable(name, header, onTap, Theme.TwilightLit.WithAlpha(0.7f));
+            var rt = btn.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(80f, 82f);
+            rt.anchoredPosition = new Vector2(-Theme.Gutter - inset, -106f);
+            return btn;
         }
 
         void BuildScroll()
@@ -389,6 +408,34 @@ namespace Gita.UI
             UpdateMuteButton();
         }
 
+        void ToggleBookmark()
+        {
+            var verse = GitaDatabase.AtFlatIndex(_flatIndex);
+            if (verse == null) return;
+            ReadingLog.ToggleBookmark(verse.c, verse.v);
+            UpdateBookmarkButton();
+        }
+
+        void UpdateBookmarkButton()
+        {
+            var verse = GitaDatabase.AtFlatIndex(_flatIndex);
+            bool on = verse != null && ReadingLog.IsBookmarked(verse.c, verse.v);
+            if (_bookmarkGlyph != null)
+            {
+                _bookmarkGlyph.text = on ? "★" : "☆";   // filled or hollow star
+                _bookmarkGlyph.color = on ? Theme.Saffron : Theme.Muted;
+            }
+            if (_bookmarkBg != null)
+                _bookmarkBg.color = on ? Theme.Saffron.WithAlpha(0.22f) : Theme.TwilightLit.WithAlpha(0.7f);
+        }
+
+        void ShareCurrent()
+        {
+            var verse = GitaDatabase.AtFlatIndex(_flatIndex);
+            if (verse == null) return;
+            VerseShare.Share(verse, ActiveEdition());
+        }
+
         void UpdateMuteButton()
         {
             bool on = AppSettings.AudioEnabled;
@@ -474,6 +521,7 @@ namespace Gita.UI
 
             PaintChips();
             UpdateMuteButton();
+            UpdateBookmarkButton();
 
             // Text length varies by an order of magnitude across the corpus, so the
             // layout has to be rebuilt before the scroll position means anything.
@@ -481,6 +529,7 @@ namespace Gita.UI
             _scroll.verticalNormalizedPosition = 1f;
 
             AppSettings.RememberPosition(verse.c, verse.v);
+            ReadingLog.MarkRead(verse.c, verse.v);
 
             if (speak && AppSettings.AudioEnabled) SpeakCurrent();
             else if (speak) Narration.Stop();

@@ -212,6 +212,10 @@ namespace Gita.EditorTools
             PlayerSettings.Android.renderOutsideSafeArea = true; // we inset the UI ourselves
             PlayerSettings.Android.optimizedFramePacing = true;
 
+            // Lets narration keep going while the app is unfocused. It does not survive
+            // the screen turning off - that needs a foreground service.
+            PlayerSettings.runInBackground = true;
+
             PlayerSettings.gpuSkinning = true;
             PlayerSettings.MTRendering = true;
             PlayerSettings.stripEngineCode = true;

@@ -196,7 +196,15 @@ namespace Gita.Data
             }
         }
 
-        /// <summary>Substring search across the Sanskrit, transliteration and one edition.</summary>
+        /// <summary>
+        /// Substring search over the Sanskrit, the transliteration and every shipped
+        /// translation.
+        ///
+        /// Deliberately not limited to the edition being read: someone with the French
+        /// text selected may well search an English word they half-remember, and
+        /// finding nothing would be unhelpful. The result is shown in their own
+        /// language regardless of which translation matched.
+        /// </summary>
         public static List<Verse> Search(string query, int edition, int limit = 60)
         {
             var results = new List<Verse>();
@@ -206,10 +214,27 @@ namespace Gita.Data
             foreach (var verse in Verses)
             {
                 if (results.Count >= limit) break;
-                if (Contains(TextOf(verse, edition), query) ||
-                    Contains(verse.tr, query) ||
-                    Contains(verse.sa, query))
+
+                if (Contains(verse.tr, query) || Contains(verse.sa, query))
+                {
                     results.Add(verse);
+                    continue;
+                }
+
+                // The reader's own edition first, so the obvious matches rank early.
+                if (Contains(TextOf(verse, edition), query))
+                {
+                    results.Add(verse);
+                    continue;
+                }
+
+                if (verse.t == null) continue;
+                foreach (var translation in verse.t)
+                {
+                    if (!Contains(translation, query)) continue;
+                    results.Add(verse);
+                    break;
+                }
             }
             return results;
         }

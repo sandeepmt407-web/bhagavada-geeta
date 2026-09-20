@@ -19,7 +19,7 @@ namespace Gita.UI
 
         Verse _today;
         ShapedText _saText;
-        TextMeshProUGUI _enText, _refText, _langLabel, _continueLabel;
+        TextMeshProUGUI _enText, _refText, _langLabel, _continueLabel, _subLabel;
         GameObject _continueRow;
 
         public override void Build(RectTransform parent)
@@ -83,16 +83,16 @@ namespace Gita.UI
             english.rectTransform.TopBand(86f, 96f);
             english.characterSpacing = 12f;
 
-            var sub = UIKit.Text("Sub", block, "The Song of the Lord  ·  701 verses  ·  18 chapters",
+            _subLabel = UIKit.Text("Sub", block, "",
                 Theme.Sans, Theme.SizeCaption, Theme.Muted, TextAlignmentOptions.Top);
-            sub.rectTransform.TopBand(196f, 40f);
-            sub.characterSpacing = 3f;
+            _subLabel.rectTransform.TopBand(196f, 40f);
+            _subLabel.characterSpacing = 3f;
         }
 
         void BuildVerseCard()
         {
             var card = UIKit.Node("VerseCard", Root)
-                .BottomBand(bottom: 430f, height: 520f, inset: Theme.Gutter);
+                .BottomBand(bottom: 476f, height: 466f, inset: Theme.Gutter);
 
             var bg = UIKit.Panel("Bg", card, Theme.Twilight.WithAlpha(0.74f), UIKit.RoundedSoft);
             bg.rectTransform.Inset(0f, 0f, 0f, 0f);
@@ -108,11 +108,11 @@ namespace Gita.UI
             _saText = ShapedText.Create("Sanskrit", card,
                 Theme.Devanagari, NativeText.SerifDevanagari, Theme.SizeVerseSa - 6f,
                 Theme.Cream, NativeText.AlignCenter, lineSpacing: 1.25f);
-            ((RectTransform)_saText.transform).TopBand(84f, 170f, 44f);
+            ((RectTransform)_saText.transform).TopBand(80f, 148f, 44f);
 
             _enText = UIKit.Text("Body", card, "",
                 Theme.Serif, Theme.SizeBody - 2f, Theme.Parchment, TextAlignmentOptions.Top);
-            _enText.rectTransform.TopBand(262f, 190f, 44f);
+            _enText.rectTransform.TopBand(236f, 168f, 44f);
             _enText.lineSpacing = 8f;
 
             _refText = UIKit.Text("Ref", card, "",
@@ -127,7 +127,7 @@ namespace Gita.UI
         void BuildContinueRow()
         {
             var host = UIKit.Node("Continue", Root)
-                .BottomBand(bottom: 352f, height: 62f, inset: Theme.Gutter);
+                .BottomBand(bottom: 410f, height: 56f, inset: Theme.Gutter);
             _continueRow = host.gameObject;
 
             var btn = UIKit.Tappable("Tap", host, ContinueReading);
@@ -142,9 +142,39 @@ namespace Gita.UI
 
         void BuildButtons()
         {
-            Button(220f, "READ THE BOOK", true, () => AppRoot.Instance?.OpenBook(1));
-            Button(92f, "THE EIGHTEEN CHAPTERS", false,
+            BuildQuickRow();
+            Button(166f, "READ THE BOOK", true, () => AppRoot.Instance?.OpenBook(1));
+            Button(54f, "THE EIGHTEEN CHAPTERS", false,
                 () => AppRoot.Instance?.GoTo(ScreenId.Chapters));
+        }
+
+        /// <summary>Search, saved verses and the collections, as one row of three.</summary>
+        void BuildQuickRow()
+        {
+            var row = UIKit.Node("Quick", Root).BottomBand(286f, 100f, Theme.Gutter);
+
+            Quick(row, 0, "Search", ScreenId.Search);
+            Quick(row, 1, "Saved", ScreenId.Bookmarks);
+            Quick(row, 2, "Collections", ScreenId.Collections);
+        }
+
+        void Quick(RectTransform row, int index, string label, ScreenId target)
+        {
+            const float gap = 12f;
+            var cell = UIKit.Node(label, row);
+            cell.anchorMin = new Vector2(index / 3f, 0f);
+            cell.anchorMax = new Vector2((index + 1) / 3f, 1f);
+            cell.offsetMin = new Vector2(gap * 0.5f, 0f);
+            cell.offsetMax = new Vector2(-gap * 0.5f, 0f);
+
+            var btn = UIKit.Tappable("Btn", cell, () => AppRoot.Instance?.GoTo(target),
+                Theme.TwilightLit.WithAlpha(0.7f));
+            btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
+
+            var text = UIKit.Text("Label", btn.transform, label,
+                Theme.Sans, 21f, Theme.Cream, TextAlignmentOptions.Center);
+            text.rectTransform.Inset(4f, 0f, 4f, 0f);
+            text.overflowMode = TextOverflowModes.Ellipsis;
         }
 
         void Button(float bottom, string label, bool primary, Action onTap)
@@ -167,12 +197,14 @@ namespace Gita.UI
         public override void OnShow()
         {
             AppSettings.Changed += Refresh;
+            ReadingLog.Changed += Refresh;
             Refresh();
         }
 
         public override void OnHidden()
         {
             AppSettings.Changed -= Refresh;
+            ReadingLog.Changed -= Refresh;
         }
 
         void Refresh()
@@ -180,6 +212,13 @@ namespace Gita.UI
             var edition = AppSettings.Current;
             if (_langLabel != null && edition != null)
                 _langLabel.text = $"{edition.langLabel} · {edition.translator}";
+
+            // Once reading has begun, the subtitle becomes a quiet progress line.
+            int read = ReadingLog.ReadCount;
+            int total = GitaDatabase.Verses.Length;
+            _subLabel.text = read > 0
+                ? $"The Song of the Lord  ·  {read} of {total} read"
+                : $"The Song of the Lord  ·  {total} verses  ·  18 chapters";
 
             _today = GitaDatabase.VerseOfTheDay(DateTime.Now);
             if (_today != null)

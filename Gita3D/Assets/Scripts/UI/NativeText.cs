@@ -21,6 +21,8 @@ namespace Gita.UI
         /// <summary>Font paths are relative to StreamingAssets, which lands in APK assets/.</summary>
         public const string SerifDevanagari = "Fonts/NotoSerifDevanagari-Regular.ttf";
         public const string SansDevanagari = "Fonts/NotoSansDevanagari-Regular.ttf";
+        public const string SerifLatin = "Fonts/EBGaramond-Regular.ttf";
+        public const string SansLatin = "Fonts/Inter-SemiBold.ttf";
 
         static bool _probed;
         static bool _available;

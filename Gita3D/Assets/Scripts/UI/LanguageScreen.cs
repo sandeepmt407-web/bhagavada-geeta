@@ -157,6 +157,18 @@ namespace Gita.UI
 
             SpeedRow();
 
+            Heading("DAILY VERSE");
+            Row(DailyVerse.Enabled ? "A verse each morning" : "Daily verse is off",
+                DailyVerse.Enabled ? null : "Turn this on to be sent one verse a day",
+                DailyVerse.Enabled,
+                () =>
+                {
+                    DailyVerse.Enabled = !DailyVerse.Enabled;
+                    Rebuild();
+                });
+
+            if (DailyVerse.Enabled) HourRow();
+
             LayoutRebuilder.ForceRebuildLayoutImmediate(_content);
         }
 
@@ -302,6 +314,55 @@ namespace Gita.UI
 
                 var t = UIKit.Text("Label", btn.transform, name,
                     Theme.Sans, 21f, on ? Theme.NightDeep : Theme.Parchment,
+                    TextAlignmentOptions.Center);
+                t.rectTransform.Inset(0f, 0f, 0f, 0f);
+            }
+
+            _rows.Add(host.gameObject);
+        }
+
+        /// <summary>When the daily verse arrives. Four sensible hours rather than a clock.</summary>
+        void HourRow()
+        {
+            var host = UIKit.Node("HourHost", _content);
+            var el = host.gameObject.AddComponent<LayoutElement>();
+            el.preferredHeight = 112f;
+            el.minHeight = 112f;
+
+            var label = UIKit.Text("Label", host, "ARRIVES AT",
+                Theme.SansBold, 19f, Theme.Muted, TextAlignmentOptions.TopLeft);
+            label.rectTransform.TopBand(0f, 28f, 4f);
+            label.characterSpacing = 6f;
+
+            var options = new (string name, int hour)[]
+            {
+                ("5 am", 5), ("6 am", 6), ("7 am", 7), ("9 pm", 21),
+            };
+
+            for (int i = 0; i < options.Length; i++)
+            {
+                var (name, hour) = options[i];
+                bool on = DailyVerse.Hour == hour;
+
+                var cell = UIKit.Node($"Hour{i}", host);
+                cell.anchorMin = new Vector2(i / (float)options.Length, 0f);
+                cell.anchorMax = new Vector2((i + 1) / (float)options.Length, 0f);
+                cell.pivot = new Vector2(0.5f, 0f);
+                cell.offsetMin = new Vector2(i == 0 ? 0f : 6f, 0f);
+                cell.offsetMax = new Vector2(i == options.Length - 1 ? 0f : -6f, 0f);
+                cell.sizeDelta = new Vector2(cell.sizeDelta.x, 66f);
+
+                int captured = hour;
+                var btn = UIKit.Tappable("Tap", cell, () =>
+                    {
+                        DailyVerse.Hour = captured;
+                        Rebuild();
+                    },
+                    on ? Theme.Saffron.WithAlpha(0.92f) : Theme.TwilightLit.WithAlpha(0.55f));
+                btn.GetComponent<RectTransform>().Inset(0f, 0f, 0f, 0f);
+
+                var t = UIKit.Text("Label", btn.transform, name,
+                    Theme.Sans, 20f, on ? Theme.NightDeep : Theme.Parchment,
                     TextAlignmentOptions.Center);
                 t.rectTransform.Inset(0f, 0f, 0f, 0f);
             }
