@@ -61,9 +61,6 @@ namespace Gita.UI
         Image _audioBg, _playIcon;
         RectTransform _pauseIcon;
         TextMeshProUGUI _audioLabel;
-        bool _wasActive;
-        float _audioPoll;
-        float _speakAt = -99f;
 
         readonly List<TabSpec> _tabs = new();
         readonly List<GameObject> _chipObjects = new();
@@ -270,16 +267,26 @@ namespace Gita.UI
         }
 
         /// <summary>
-        /// Switches between hearing the shloka and hearing what it means, and reads the
-        /// verse again straight away so the choice is audible rather than theoretical.
+        /// The shloka switch: whether the Sanskrit is read.
+        ///
+        /// Independent of the footer control. With both on, every verse gives the shloka
+        /// first and then its meaning.
         /// </summary>
         void ToggleSanskrit()
         {
-            AppSettings.NarrateSanskrit = !AppSettings.NarrateSanskrit;
+            bool on = !AppSettings.NarrateSanskrit;
+            AppSettings.NarrateSanskrit = on;
 
-            // Tapping a speaker means "play this". If narration was stopped, start it.
-            AppSettings.AudioEnabled = true;
-            SpeakCurrent();
+            if (on)
+            {
+                SpeakCurrent();
+            }
+            else
+            {
+                Narration.Stop();
+                if (AppSettings.AudioEnabled) SpeakCurrent();
+                else AudioSession.End();
+            }
             UpdateSanskritButton();
             UpdateAudioButton();
         }
@@ -537,41 +544,44 @@ namespace Gita.UI
             Refresh();
         }
 
+        /// <summary>
+        /// Switches which reading is shown, and reads it aloud in its own language.
+        ///
+        /// Choosing the Hindi tab is a request to hear the Hindi, so it starts narrating
+        /// in a Hindi voice straight away rather than waiting to be asked twice. Picking
+        /// a tab is also a request for a meaning rather than the shloka, so it leaves
+        /// shloka mode the same way the footer control does.
+        /// </summary>
         void SetTab(Tab tab)
         {
             _tab = tab;
-            Refresh(speak: false);
+            AppSettings.AudioEnabled = true;
+            Refresh();
         }
 
         /// <summary>
-        /// The one audio control. If a verse is being read it stops, and the reading
-        /// stays silent from there; if nothing is being read it speaks this verse and
-        /// lets the following ones speak themselves.
+        /// The footer control: whether the translation is read.
+        ///
+        /// It does not touch the shloka switch. The two are independent, so a reader can
+        /// have the Sanskrit, the meaning, both in turn, or neither. Turning it on reads
+        /// the verse now as well as the ones after it.
         /// </summary>
         void ToggleAudio()
         {
-            if (AudioActive)
+            bool on = !AppSettings.AudioEnabled;
+            AppSettings.AudioEnabled = on;
+
+            if (on)
             {
-                _speakAt = -99f;
-                AppSettings.AudioEnabled = false;
-                Narration.Stop();
-                AudioSession.End();
+                SpeakCurrent();
             }
             else
             {
-                AppSettings.AudioEnabled = true;
-                SpeakCurrent();
+                Narration.Stop();
+                if (!AppSettings.NarrateSanskrit) AudioSession.End();
             }
             UpdateAudioButton();
         }
-
-        /// <summary>
-        /// Whether a verse is actually being spoken. The engine takes a moment to start,
-        /// so a request counts as speaking for a second - otherwise the button flicks
-        /// back to play for a frame or two straight after being pressed.
-        /// </summary>
-        bool AudioActive =>
-            Narration.IsSpeaking || Time.unscaledTime - _speakAt < 1f;
 
         void ToggleBookmark()
         {
@@ -608,7 +618,7 @@ namespace Gita.UI
         /// </summary>
         void UpdateAudioButton()
         {
-            bool active = AudioActive;
+            bool active = AppSettings.AudioEnabled;
 
             if (_playIcon != null) _playIcon.gameObject.SetActive(!active);
             if (_pauseIcon != null) _pauseIcon.gameObject.SetActive(active);
@@ -636,18 +646,8 @@ namespace Gita.UI
                 var mood = AppRoot.Instance?.Mood;
                 if (mood != null) _scrim.color = Theme.NightDeep.WithAlpha(mood.Scrim);
             }
-
-            // The engine finishes on its own, and nothing tells us when. Poll slowly
-            // enough to cost nothing and often enough that the button never lies.
-            _audioPoll -= Time.unscaledDeltaTime;
-            if (_audioPoll > 0f) return;
-            _audioPoll = 0.25f;
-
-            bool active = AudioActive;
-            if (active == _wasActive) return;
-            _wasActive = active;
-            UpdateAudioButton();
         }
+
 
         /// <summary>The edition currently on screen, falling back to the chosen one.</summary>
         int ActiveEdition()
@@ -656,55 +656,78 @@ namespace Gita.UI
                 if (spec.Kind == _tab && spec.Edition >= 0) return spec.Edition;
             return AppSettings.Edition;
         }
-
+        /// <summary>
+        /// Reads the verse according to the two switches, which are independent.
+        ///
+        /// SHLOKA on reads the Sanskrit. The footer control on reads the translation
+        /// that is on screen, in that reading's own language. With both on, the shloka
+        /// comes first and the meaning follows it, which is the order anyone reciting
+        /// would use. With neither, nothing is read.
+        /// </summary>
         void SpeakCurrent()
         {
             var verse = GitaDatabase.AtFlatIndex(_flatIndex);
             if (verse == null) return;
 
-            string text;
-            string locale;
-            string voiceLang;
+            bool wantSanskrit = AppSettings.NarrateSanskrit;
+            bool wantMeaning = AppSettings.AudioEnabled;
+            if (!wantSanskrit && !wantMeaning) return;
 
-            if (AppSettings.NarrateSanskrit)
+            string saText = wantSanskrit ? StripVerseNumber(verse.sa) : null;
+
+            string meaningText = null, meaningLocale = null, meaningVoice = null;
+            if (wantMeaning)
             {
-                // Android has no Sanskrit voice, so the shloka is read by a Hindi one -
-                // the only voice on the device that can pronounce the script at all.
-                text = verse.sa;
-                locale = AppSettings.SanskritTts;
-                voiceLang = AppSettings.SanskritVoiceLang;
+                // Read whatever is on screen, in that edition's own language - the Hindi
+                // tab should give a Hindi voice, not an English one mispronouncing it.
+                int edition = ActiveEdition();
+                meaningText = GitaDatabase.TextOf(verse, edition, out edition);
 
-                // A verse with no Sanskrit on record should fall through to its meaning
-                // rather than leaving the page silent.
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    int fallbackEdition = ActiveEdition();
-                    text = GitaDatabase.TextOf(verse, fallbackEdition, out fallbackEdition);
-                    var fallbackRecord = GitaDatabase.EditionAt(fallbackEdition);
-                    locale = fallbackRecord?.tts ?? "en-IN";
-                    voiceLang = fallbackRecord?.lang;
-                }
+                // Credit the edition the text actually came from, so a fallback is not
+                // read aloud in the wrong language's voice.
+                var record = GitaDatabase.EditionAt(edition);
+                meaningLocale = record?.tts ?? "en-IN";
+                meaningVoice = AppSettings.VoiceFor(record?.lang);
+            }
+
+            bool haveSa = !string.IsNullOrWhiteSpace(saText);
+            bool haveMeaning = !string.IsNullOrWhiteSpace(meaningText);
+            if (!haveSa && !haveMeaning) return;
+
+            if (haveSa)
+            {
+                Narration.SpeakPair(
+                    saText, AppSettings.SanskritTts,
+                    AppSettings.VoiceFor(AppSettings.SanskritVoiceLang),
+                    haveMeaning ? meaningText : "", meaningLocale, meaningVoice,
+                    AppSettings.SpeechRate);
             }
             else
             {
-                // Read whatever is on screen, in that edition's own language - switching
-                // to the Hindi tab should give a Hindi voice, not an English one.
-                int edition = ActiveEdition();
-                text = GitaDatabase.TextOf(verse, edition, out edition);
-
-                // Use the edition the text actually came from, so a fallback is not read
-                // aloud in the wrong language's voice.
-                var record = GitaDatabase.EditionAt(edition);
-                locale = record?.tts ?? "en-IN";
-                voiceLang = record?.lang;
+                Narration.Speak(meaningText, meaningLocale, AppSettings.SpeechRate,
+                    voiceName: meaningVoice);
             }
 
-            if (string.IsNullOrWhiteSpace(text)) return;
-
-            Narration.Speak(text, locale, AppSettings.SpeechRate,
-                voiceName: AppSettings.VoiceFor(voiceLang));
-            _speakAt = Time.unscaledTime;
             AudioSession.Begin();   // hold the screen awake while a verse is read
+        }
+
+        /// <summary>
+        /// Removes the verse number the corpus carries at the end of each shloka.
+        ///
+        /// Every one of the 701 ends with something like "।।2.47।।", which is a printing
+        /// convention, not part of the verse. Left in, the speech engine reads it out as
+        /// a number after the line, which is both wrong and jarring. The last verse ends
+        /// with a single closing danda rather than two, so the count is not assumed.
+        /// </summary>
+        static string StripVerseNumber(string sanskrit)
+        {
+            if (string.IsNullOrEmpty(sanskrit)) return sanskrit;
+            // । is the danda and ॥ the double danda. Written as codepoints
+            // rather than as characters so the pattern cannot be broken by anything
+            // that re-saves this file in the wrong encoding.
+            return System.Text.RegularExpressions.Regex.Replace(
+                sanskrit, "[।॥]+\\s*[0-9][0-9.,\\-\\s]*[।॥]*\\s*$", "")
+                .TrimEnd();
         }
 
         void Refresh(bool speak = true)

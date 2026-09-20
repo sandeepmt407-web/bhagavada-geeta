@@ -48,6 +48,9 @@ public final class Narrator {
     private static volatile boolean sVoiceNeedsNetwork;
     private static volatile boolean sRetrying;
     private static volatile String sLastText = "";
+    private static volatile String sNextText = "";
+    private static volatile String sNextLocale = "";
+    private static volatile String sNextVoice = "";
     private static volatile float sLastRate = 1f;
     private static volatile float sLastPitch = 1f;
 
@@ -112,7 +115,13 @@ public final class Narrator {
 
                     sTts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                         @Override public void onStart(String id) { sSpeaking = true; }
-                        @Override public void onDone(String id) { sSpeaking = false; sRetrying = false; }
+                        @Override public void onDone(String id) {
+                            sRetrying = false;
+                            // A shloka is followed by its translation, in another
+                            // language; if one is waiting, start it before reporting
+                            // that speech has stopped.
+                            if (!speakQueued()) sSpeaking = false;
+                        }
                         @Override public void onStop(String id, boolean interrupted) {
                             sSpeaking = false;
                             sRetrying = false;
@@ -128,7 +137,7 @@ public final class Narrator {
                          */
                         @Override public void onError(String id) {
                             sSpeaking = false;
-                            if (sRetrying || !sVoiceNeedsNetwork) { sRetrying = false; return; }
+                            if (sRetrying || !sVoiceNeedsNetwork) { sRetrying = false; sNextText = ""; return; }
                             if (sLastText == null || sLastText.length() == 0) return;
 
                             sRetrying = true;
@@ -375,56 +384,113 @@ public final class Narrator {
     }
 
     /**
-     * Speaks text, replacing anything currently being spoken.
+     * Selects a language and voice, if they are not already the ones in force.
      *
-     * voiceName names one of the voices listVoices returned. Empty means let the best
-     * one be chosen automatically, which is what happens until the reader picks.
+     * Pulled out of speak() because a shloka followed by its translation needs this
+     * done twice in the one utterance sequence, with a different language each time.
      */
+    private static void applyLanguage(String localeTag, String voiceName) {
+        String want = voiceName == null ? "" : voiceName;
+        if (localeTag.equals(sCurrentLocale) && want.equals(sRequestedVoice)) return;
+
+        Locale wanted = parse(localeTag);
+        int r = sTts.setLanguage(wanted);
+        if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
+            // Fall back to the device default rather than going silent.
+            wanted = Locale.getDefault();
+            sTts.setLanguage(wanted);
+        }
+        // The reader's own choice wins. If that voice has since been uninstalled,
+        // pick the best available rather than going quiet.
+        if (!applyVoice(want)) selectBestVoice(wanted);
+        sCurrentLocale = localeTag;
+        sRequestedVoice = want;
+    }
+
+    /** Speaks text, replacing anything currently being spoken. */
     public static void speak(final String text, final String localeTag,
                              final float rate, final float pitch,
                              final String voiceName) {
-        if (!isReady() || text == null || text.length() == 0) return;
+        speakPair(text, localeTag, voiceName, "", "", "", rate, pitch);
+    }
+
+    /**
+     * Speaks one passage and then, when it has finished, another in a different
+     * language.
+     *
+     * This exists because the shloka and its translation are not in the same tongue, and
+     * TextToSpeech applies a language change immediately rather than per queued
+     * utterance - so queueing both and switching language between them would read the
+     * second in whatever voice the first left behind. Waiting for the first to finish is
+     * the only way to give each its own voice. Pass an empty second text for a single
+     * passage.
+     */
+    public static void speakPair(final String firstText, final String firstLocale,
+                                 final String firstVoice,
+                                 final String secondText, final String secondLocale,
+                                 final String secondVoice,
+                                 final float rate, final float pitch) {
+        if (!isReady() || firstText == null || firstText.length() == 0) return;
 
         onUi(new Runnable() {
             @Override public void run() {
                 try {
-                    String want = voiceName == null ? "" : voiceName;
-                    if (!localeTag.equals(sCurrentLocale) || !want.equals(sRequestedVoice)) {
-                        Locale wanted = parse(localeTag);
-                        int r = sTts.setLanguage(wanted);
-                        if (r == TextToSpeech.LANG_MISSING_DATA ||
-                            r == TextToSpeech.LANG_NOT_SUPPORTED) {
-                            // Fall back to the device default rather than going silent.
-                            wanted = Locale.getDefault();
-                            sTts.setLanguage(wanted);
-                        }
-                        // The reader's own choice wins. If that voice has since been
-                        // uninstalled, pick the best available rather than going quiet.
-                        if (!applyVoice(want)) selectBestVoice(wanted);
-                        sCurrentLocale = localeTag;
-                        sRequestedVoice = want;
-                    }
+                    applyLanguage(firstLocale, firstVoice);
+
                     sTts.setSpeechRate(rate <= 0f ? 1f : rate);
                     sTts.setPitch(pitch <= 0f ? 1f : pitch);
 
                     // Kept so a failed network voice can be retried offline.
-                    sLastText = text;
+                    sLastText = firstText;
                     sLastRate = rate;
                     sLastPitch = pitch;
                     sRetrying = false;
 
+                    sNextText = secondText == null ? "" : secondText;
+                    sNextLocale = secondLocale == null ? "" : secondLocale;
+                    sNextVoice = secondVoice == null ? "" : secondVoice;
+
                     sSpeaking = true;
-                    Bundle params = new Bundle();
-                    sTts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "gita");
+                    sTts.speak(firstText, TextToSpeech.QUEUE_FLUSH, new Bundle(), "gita");
                 } catch (Throwable t) {
                     sSpeaking = false;
+                    sNextText = "";
                 }
             }
         });
     }
 
+    /** Starts the queued second passage, if there is one. Returns true if it did. */
+    private static boolean speakQueued() {
+        final String text = sNextText;
+        if (text == null || text.length() == 0) return false;
+
+        final String locale = sNextLocale;
+        final String voice = sNextVoice;
+        sNextText = "";
+
+        // Held true across the gap so the interface does not flicker back to "play"
+        // between the shloka and its translation.
+        sSpeaking = true;
+
+        onUi(new Runnable() {
+            @Override public void run() {
+                try {
+                    applyLanguage(locale, voice);
+                    sLastText = text;
+                    sRetrying = false;
+                    sTts.speak(text, TextToSpeech.QUEUE_FLUSH, new Bundle(), "gita");
+                } catch (Throwable t) {
+                    sSpeaking = false;
+                }
+            }
+        });
+        return true;
+    }
+
     public static void stop() {
         sSpeaking = false;
+        sNextText = "";   // drop any translation queued behind a shloka
         if (sTts == null) return;
         onUi(new Runnable() {
             @Override public void run() {
@@ -437,6 +503,7 @@ public final class Narrator {
         sSpeaking = false;
         sReady = false;
         sCurrentLocale = "";
+        sNextText = "";
         sRequestedVoice = "";
         final TextToSpeech engine = sTts;
         sTts = null;

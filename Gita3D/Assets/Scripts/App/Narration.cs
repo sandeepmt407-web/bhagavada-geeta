@@ -223,6 +223,46 @@ namespace Gita.App
 #endif
         }
 
+
+        /// <summary>
+        /// Speaks one passage and then another in a different language.
+        ///
+        /// Used for a shloka followed by its translation. The pair has to be handed over
+        /// together: the speech engine applies a language change immediately rather than
+        /// per queued utterance, so the second passage has to wait for the first to
+        /// finish before its own voice can be selected.
+        /// </summary>
+        public static void SpeakPair(
+            string firstText, string firstLocale, string firstVoice,
+            string secondText, string secondLocale, string secondVoice,
+            float rate = 0.88f, float pitch = 0.96f)
+        {
+            if (string.IsNullOrWhiteSpace(firstText))
+            {
+                Speak(secondText, secondLocale, rate, pitch, secondVoice);
+                return;
+            }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (_unavailable || _narrator == null) return;
+            try
+            {
+                if (firstText.Length > 3800) firstText = firstText.Substring(0, 3800);
+                if (!string.IsNullOrEmpty(secondText) && secondText.Length > 3800)
+                    secondText = secondText.Substring(0, 3800);
+
+                _narrator.CallStatic("speakPair",
+                    firstText, firstLocale ?? "en-IN", firstVoice ?? "",
+                    secondText ?? "", secondLocale ?? "", secondVoice ?? "",
+                    rate, pitch);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Gita] SpeakPair failed: {e.Message}");
+                _unavailable = true;
+            }
+#endif
+        }
         public static void Stop()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
