@@ -70,17 +70,29 @@ Scripts/
            PostFX                     runtime volume: ACES, bloom, grade, DOF
   UI/      Theme, UIKit               design tokens, runtime uGUI construction
            NativeText, ShapedText     Devanagari shaping (see below)
-           HomeScreen                 title, verse of the day, language pill
+           HomeScreen                 title, verse of the day, progress, entry points
            ChaptersScreen             the eighteen yogas
-           ReaderScreen               one verse at a time, mute in the header
-           BookScreen                 continuous prose, narrated straight through
-           LanguageScreen             language, translator, narration settings
+           ReaderScreen               one verse at a time; bookmark, share, mute
+           VerseListScreen            shared list body for the three below
+           SearchScreen               live search over every translation
+           BookmarksScreen            saved verses
+           CollectionsScreen          the eight themed ways in
+           LanguageScreen             language, translator, narration, daily verse
   App/     AppRoot                    boot, navigation, device tiering
            AppSettings                PlayerPrefs: edition, audio, reading position
+           ReadingLog                 bookmarks, and progress as a packed bitset
            Narration                  bridge to the Android speech engine
+           DailyVerse                 the morning notification
+           VerseShare                 renders and shares the verse card
+           AudioSession               holds the screen awake while narrating
 Plugins/Android/com/gita/text/TextRasterizer.java   Devanagari shaping
 Plugins/Android/com/gita/audio/Narrator.java        text-to-speech
+Plugins/Android/com/gita/share/Sharer.java          image and text sharing
 ```
+
+Home is always the opening screen. The language picker was briefly put in front of it
+on a first run, which meant the app opened on a settings page; it is reached from the
+pill at the top of Home instead.
 
 ## Devanagari
 
@@ -169,10 +181,9 @@ not shipped recordings. Recording 701 verses per language is a studio project, a
 files would be far larger than the app. TTS runs offline once the voice data is
 installed and follows whichever language is selected.
 
-It is on by default, mutable from the header of the verse page, and drives the sequential
-read-through in book mode. If the device has no engine, or no voice for the chosen
-language, the language screen says so plainly and the app stays silent rather than
-failing.
+It is on by default and mutable from the header of the verse page. If the device has no
+engine, or no voice for the chosen language, the language screen says so plainly and the
+app stays silent rather than failing.
 
 Sky HDRI: `qwantani_sunrise_puresky` from [Poly Haven](https://polyhaven.com), CC0.
 Fonts: Noto Serif/Sans Devanagari, EB Garamond, Inter — all SIL Open Font License.
@@ -195,6 +206,4 @@ Fonts: Noto Serif/Sans Devanagari, EB Garamond, Inter — all SIL Open Font Lice
 - The 3D set is procedural and deliberately abstract — a backlit silhouette of the halted
   chariot. It is competent, not remarkable. Real modelled assets would raise it
   considerably; this is the weakest part of the app.
-- No audio. No bookmarks, search UI, or reading position persistence — `GitaDatabase`
-  already exposes `Search`, but nothing calls it yet.
 - Unity Personal shows the Unity splash screen; it cannot be disabled on this licence.

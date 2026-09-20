@@ -371,6 +371,7 @@ namespace Gita.UI
         {
             AppSettings.Changed -= OnSettingsChanged;
             Narration.Stop();
+            AudioSession.End();
         }
 
         void OnSettingsChanged()
@@ -403,7 +404,7 @@ namespace Gita.UI
         void ToggleMute()
         {
             AppSettings.AudioEnabled = !AppSettings.AudioEnabled;
-            if (!AppSettings.AudioEnabled) Narration.Stop();
+            if (!AppSettings.AudioEnabled) { Narration.Stop(); AudioSession.End(); }
             else SpeakCurrent();
             UpdateMuteButton();
         }
@@ -471,6 +472,7 @@ namespace Gita.UI
             // aloud in the wrong language's voice.
             var record = GitaDatabase.EditionAt(edition);
             Narration.Speak(text, record?.tts ?? "en-IN", AppSettings.SpeechRate);
+            AudioSession.Begin();   // hold the screen awake while a verse is read
         }
 
         void Refresh(bool speak = true)
@@ -532,7 +534,7 @@ namespace Gita.UI
             ReadingLog.MarkRead(verse.c, verse.v);
 
             if (speak && AppSettings.AudioEnabled) SpeakCurrent();
-            else if (speak) Narration.Stop();
+            else if (speak) { Narration.Stop(); AudioSession.End(); }
         }
 
         /// <summary>

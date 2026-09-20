@@ -92,7 +92,7 @@ namespace Gita.UI
         void BuildVerseCard()
         {
             var card = UIKit.Node("VerseCard", Root)
-                .BottomBand(bottom: 476f, height: 466f, inset: Theme.Gutter);
+                .BottomBand(bottom: 404f, height: 524f, inset: Theme.Gutter);
 
             var bg = UIKit.Panel("Bg", card, Theme.Twilight.WithAlpha(0.74f), UIKit.RoundedSoft);
             bg.rectTransform.Inset(0f, 0f, 0f, 0f);
@@ -108,11 +108,11 @@ namespace Gita.UI
             _saText = ShapedText.Create("Sanskrit", card,
                 Theme.Devanagari, NativeText.SerifDevanagari, Theme.SizeVerseSa - 6f,
                 Theme.Cream, NativeText.AlignCenter, lineSpacing: 1.25f);
-            ((RectTransform)_saText.transform).TopBand(80f, 148f, 44f);
+            ((RectTransform)_saText.transform).TopBand(84f, 172f, 44f);
 
             _enText = UIKit.Text("Body", card, "",
                 Theme.Serif, Theme.SizeBody - 2f, Theme.Parchment, TextAlignmentOptions.Top);
-            _enText.rectTransform.TopBand(236f, 168f, 44f);
+            _enText.rectTransform.TopBand(262f, 194f, 44f);
             _enText.lineSpacing = 8f;
 
             _refText = UIKit.Text("Ref", card, "",
@@ -127,7 +127,7 @@ namespace Gita.UI
         void BuildContinueRow()
         {
             var host = UIKit.Node("Continue", Root)
-                .BottomBand(bottom: 410f, height: 56f, inset: Theme.Gutter);
+                .BottomBand(bottom: 338f, height: 56f, inset: Theme.Gutter);
             _continueRow = host.gameObject;
 
             var btn = UIKit.Tappable("Tap", host, ContinueReading);
@@ -143,15 +143,14 @@ namespace Gita.UI
         void BuildButtons()
         {
             BuildQuickRow();
-            Button(166f, "READ THE BOOK", true, () => AppRoot.Instance?.OpenBook(1));
-            Button(54f, "THE EIGHTEEN CHAPTERS", false,
+            Button(64f, "THE EIGHTEEN CHAPTERS", true,
                 () => AppRoot.Instance?.GoTo(ScreenId.Chapters));
         }
 
         /// <summary>Search, saved verses and the collections, as one row of three.</summary>
         void BuildQuickRow()
         {
-            var row = UIKit.Node("Quick", Root).BottomBand(286f, 100f, Theme.Gutter);
+            var row = UIKit.Node("Quick", Root).BottomBand(198f, 108f, Theme.Gutter);
 
             Quick(row, 0, "Search", ScreenId.Search);
             Quick(row, 1, "Saved", ScreenId.Bookmarks);

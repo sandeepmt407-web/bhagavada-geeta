@@ -9,7 +9,7 @@ using Gita.World;
 
 namespace Gita.App
 {
-    public enum ScreenId { Home, Chapters, Reader, Book, Language, Search, Bookmarks, Collections }
+    public enum ScreenId { Home, Chapters, Reader, Language, Search, Bookmarks, Collections }
 
     /// <summary>
     /// Single entry point. Builds the world, the camera and the interface at runtime,
@@ -25,7 +25,6 @@ namespace Gita.App
         public Canvas Canvas { get; private set; }
 
         ReaderScreen _reader;
-        BookScreen _book;
 
         readonly Dictionary<ScreenId, ScreenBase> _screens = new();
         readonly List<ScreenId> _history = new();
@@ -56,13 +55,14 @@ namespace Gita.App
 
             // Home is always the bottom of the stack. On a first run the language
             // choice is put in front of it, so the reader starts in their own language.
+            // Home is always what opens. The language picker is reachable from the pill
+            // at the top of it; putting it in front on a first run meant the app opened
+            // on a settings page.
             GoTo(ScreenId.Home, pushHistory: false, fade: 0.8f);
 
             // A tap on the daily notification opens straight to that verse.
             var invited = DailyVerse.OpenedFromNotification();
             if (invited != null) OpenVerse(invited.c, invited.v);
-            else if (!AppSettings.HasChosenLanguage)
-                GoTo(ScreenId.Language, pushHistory: true, fade: 0.6f);
         }
 
         static void ConfigureRuntime()
@@ -146,7 +146,6 @@ namespace Gita.App
             Add<HomeScreen>(ScreenId.Home, safe);
             Add<ChaptersScreen>(ScreenId.Chapters, safe);
             _reader = Add<ReaderScreen>(ScreenId.Reader, safe);
-            _book = Add<BookScreen>(ScreenId.Book, safe);
             Add<LanguageScreen>(ScreenId.Language, safe);
             Add<SearchScreen>(ScreenId.Search, safe);
             Add<BookmarksScreen>(ScreenId.Bookmarks, safe);
@@ -192,12 +191,6 @@ namespace Gita.App
         {
             _reader.SetVerse(chapter, verse);
             GoTo(ScreenId.Reader);
-        }
-
-        public void OpenBook(int chapter)
-        {
-            _book.Open(chapter);
-            GoTo(ScreenId.Book);
         }
 
         public bool GoBack()
