@@ -1,0 +1,23 @@
+# ninja log v5
+9310	10525	8115850535544920	C:/Users/sverm/.claude/geeta/Gita3D/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/3h5i6m3j/obj/armeabi-v7a/libswappywrapper.so	c6f6a97e8edfcfbc
+12	9152	8115850457999961	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	4ce986db5f2407aa
+8112	9309	8115850523555518	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	12717b29f9a07440
+2046	9157	8115850473768176	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	78e7a02ec73ef59b
+7106	9358	8115850523998330	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	e16b3aee977837d7
+981	9155	8115850464780392	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	8eb04a781c306288
+5054	9162	8115850504641580	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	f76da9fbc4156d0e
+6041	9164	8115850516095379	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	7b7102bc6897b49e
+3072	9158	8115850483308019	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	701d635af3fc3fe3
+4063	9160	8115850497574053	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	c7cdce16b82d372a
+9359	10531	8115850535668397	C:/Users/sverm/.claude/geeta/Gita3D/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/3h5i6m3j/obj/armeabi-v7a/libgame.so	ee4b4e2f4a6d457
+13	9878	8115851290883016	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	4ce986db5f2407aa
+1335	9881	8115851296279504	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	78e7a02ec73ef59b
+2521	9883	8115851306531394	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	701d635af3fc3fe3
+3587	9885	8115851317840914	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	8eb04a781c306288
+4654	9888	8115851328261550	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	f76da9fbc4156d0e
+5720	9891	8115851339490323	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	7b7102bc6897b49e
+6725	9893	8115851351874039	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	c7cdce16b82d372a
+8806	10029	8115851357843895	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	12717b29f9a07440
+7766	10110	8115851358590284	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	e16b3aee977837d7
+10030	11196	8115851369358740	C:/Users/sverm/.claude/geeta/Gita3D/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/3h5i6m3j/obj/armeabi-v7a/libswappywrapper.so	c6f6a97e8edfcfbc
+10111	11246	8115851369888501	C:/Users/sverm/.claude/geeta/Gita3D/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/3h5i6m3j/obj/armeabi-v7a/libgame.so	ee4b4e2f4a6d457

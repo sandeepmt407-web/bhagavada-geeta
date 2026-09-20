@@ -1,0 +1,22 @@
+# Unity generated
+Gita3D/Library/
+Gita3D/Temp/
+Gita3D/Obj/
+Gita3D/Logs/
+Gita3D/UserSettings/
+Gita3D/*.csproj
+Gita3D/*.sln
+
+# build outputs and tooling downloads
+build/
+android-sdk/
+avd/
+_tools/obj/
+_tools/bin/
+
+# signing material must never be committed
+keystore/
+
+# archived release binaries (kept on disk, not in history)
+releases/**/*.apk
+releases/**/*.aab
