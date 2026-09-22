@@ -97,6 +97,7 @@ Scripts/
            VerseShare                 renders and shares the verse card
            AudioSession               holds the screen awake while narrating
            Ambience                   the bansuri bed, and its ducking
+           Ads, AdIds                 AdMob: banner placement, interstitials, consent
 Plugins/Android/com/gita/text/TextRasterizer.java   Devanagari shaping
 Plugins/Android/com/gita/ui/Insets.java             real system-bar insets
 Plugins/Android/com/gita/audio/Narrator.java        text-to-speech
@@ -167,6 +168,12 @@ because it is a maximum rather than a sum the two can never be counted twice. If
 native call fails the app falls back to `Screen.safeArea` exactly as before. `SystemBarScrim`
 then continues the dark ground of the interface into the strips behind the bars, so there
 is no hard edge where a panel stops.
+
+The navigation bar comes and goes: fullscreen hides it, and the first touch brings it back.
+Nothing the layout listens to changes when it does, so the fitter keeps asking for the
+insets a few times a second for as long as the app runs. The interface - and a bottom
+banner, which follows the same insets - uses the full height while the bar is hidden and
+moves clear of it while it shows, so the reader's Previous and Next are never under it.
 ## The set, per verse
 
 Every verse gets its own treatment of the Kurukshetra set. `VerseMood` holds ten looks -
@@ -427,6 +434,87 @@ Bansuri: `Bansuri sample E bass` from Wikimedia Commons, public domain.
 Sky HDRI: `qwantani_sunrise_puresky` from [Poly Haven](https://polyhaven.com), CC0.
 Fonts: Noto Serif/Sans Devanagari, EB Garamond, Inter — all SIL Open Font License.
 
+## Ads
+
+The app is free and carries AdMob adverts (`Scripts/App/Ads.cs`), in exactly these
+places:
+
+| Where | What |
+|---|---|
+| The verse page | Banner at the **top**, under the status bar |
+| Chapters, Search, Saved, Collections | Banner at the **bottom**, above the navigation bar |
+| After every fifth verse read forward | Interstitial |
+| Home, Language & Narration | Nothing |
+
+**One banner, moved.** There is a single anchored adaptive banner. Each screen declares
+where it wants it (`ScreenBase.Banner`, the same way it declares `CameraShot`) and
+`AppRoot.GoTo` moves it there or hides it. It is created the first time a screen asks
+for one, so a session that never leaves Home never requests a banner.
+
+**Top in the reader, for a reason.** The reader's footer holds Next, which is tapped on
+every verse. A banner directly under the most-pressed control in the app collects
+accidental clicks, and AdMob treats those as invalid traffic - enough of them and ad
+serving on the account is limited. The lists have nothing tappable at their foot.
+
+**Held clear of, not drawn over.** The banner is a native Android view floating above
+Unity. The plugin's own `AdPosition.Top` and `Bottom` keep clear of the camera cutout
+only; this app draws under the status and navigation bars, so they would put the banner
+beneath them. It is placed by coordinates instead, against the same insets the interface
+uses (`SafeAreaFitter.SystemPixels`), and once an advert has arrived its height goes back
+to the fitter as one more inset (`SetBannerClearance`). With no advert - offline, or
+nothing to show - nothing is inset and every screen is laid out as it always was.
+
+**The interstitial** follows every fifth verse read with Next or a swipe; Previous, and
+opening a verse from a list, do not count. The page turns underneath it; narration stops
+and the bansuri pauses while it is up, because Android does not always pause Unity for an
+advert drawn over it; and the new verse is read aloud once it is dismissed. Two are never
+less than a minute apart (`MinSecondsBetweenInterstitials`). Five verses take minutes to
+read, so that only touches someone flicking through, who would otherwise meet one every
+few seconds. If none has loaded yet the count carries on, and it shows on the first verse
+after one arrives.
+
+Adverts are capped at a **G** content rating in code.
+
+**Consent.** Google requires a certified consent form for readers in the EEA, the UK and
+Switzerland. The UMP SDK that comes with the plugin handles it: at launch it asks whether
+this reader has to be asked, shows Google's form if so, and no advert is requested until
+it allows. Where it applies, Language & Narration gains a **Privacy choices** row so the
+answer can be changed later; everywhere else the row does not exist. The form's wording
+is set in AdMob under Privacy & messaging - publish a GDPR message there, or readers in
+Europe get limited adverts or none.
+
+### IDs
+
+`Scripts/App/AdIds.cs` holds the app ID and the two ad unit IDs - the real ones for this
+app, with Google's test IDs in a comment beside them. A build made with test IDs logs a
+warning. `ProjectConfig.ConfigureAds`, which every build runs, writes the app ID into the
+plugin's settings asset, and the plugin's build step puts it in the Android manifest from
+there - the build refuses to run without one.
+
+Never tap real adverts on your own phone; AdMob counts it as invalid traffic. Register the
+phone in AdMob under Settings, Test devices, and it gets test adverts with the real IDs.
+
+**Banner refresh** is every 30 seconds, and it is set on the banner ad unit in AdMob
+(Ad units, the banner, Advanced settings, Automatic refresh, Custom: 30 seconds) - not in
+code, which has no way to set it. The SDK refreshes only while the banner is on screen:
+`Hide()` on Home and Language & Narration pauses it. The app loads the banner itself only
+for the first advert, and again only if that one never arrived, so the two never refresh
+it twice.
+
+### The plugin
+
+`com.google.ads.mobile` (Google Mobile Ads for Unity) comes from OpenUPM through the
+scoped registry in `Packages/manifest.json`, along with the External Dependency Manager
+it depends on. At build time the plugin creates `mainTemplate.gradle`,
+`gradleTemplate.properties` and `settingsTemplate.gradle` in `Assets/Plugins/Android/`,
+and the dependency manager writes the Play Services dependencies into them. They are
+committed, so the Gradle build is the same on every machine. The plugin also copies its
+`link.xml` into `Assets/GoogleMobileAds/`, which keeps IL2CPP from stripping the classes
+Android calls back into.
+
+`app-ads.txt` is served from the root of the Firebase site,
+https://myweb-d8cca.web.app/app-ads.txt, out of `playstore-requirements/legal/public/`.
+
 ## Known limitations
 
 - **The navigation-bar fix has not been run on real hardware either.** `Insets.java`
@@ -437,9 +525,11 @@ Fonts: Noto Serif/Sans Devanagari, EB Garamond, Inter — all SIL Open Font Lice
 - **The native Devanagari path has not been run on real hardware.** It is verified only
   as far as static checks go: the class compiles into `classes.dex`
   (`Lcom/gita/text/TextRasterizer;` with `rasterize` and `measureHeight`), and the fonts
-  ship at `assets/Fonts/`. It could not be executed here, because Unity 6.6 dropped
-  Android x86-64 (`AndroidArchitecture.X86_64` is obsolete), so an ARM-only build cannot
-  run on a standard x86_64 emulator, and no ARM device was attached.
+  ship at `assets/Fonts/`. Unity 6.6 dropped Android x86-64, so the build is ARM-only.
+  It does run on an emulator whose image translates ARM - the Android 11 Google APIs
+  x86_64 image, AVD `gita-ads` in `avd/` - but only as 32-bit
+  (`adb install --abi armeabi-v7a`); the 64-bit build crashes there with SIGILL inside
+  Unity. The emulator uses Android's own text stack too, so it is a fair check.
   **Install the APK on an Android phone and check one verse before releasing.** What to
   look for, using 1.3: the transliteration reads *śhiṣhyeṇa*, so the Devanagari must
   render शिष्येण — if it shows शष्येिण, with the i-hook after the consonant instead of

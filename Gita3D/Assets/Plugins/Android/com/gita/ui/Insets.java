@@ -48,7 +48,8 @@ public final class Insets {
     /**
      * Asks Android for the current insets. Returns immediately; the values land on the
      * UI thread a frame or so later. Safe to call every frame, though there is no
-     * reason to - the caller polls it while the layout settles and after rotations.
+     * reason to - the caller polls it a few times a second, because the navigation bar
+     * comes and goes.
      */
     public static void refresh() {
         final Activity a = activity();

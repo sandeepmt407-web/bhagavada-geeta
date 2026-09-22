@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
@@ -31,6 +32,7 @@ namespace Gita.EditorTools
             ConfigurePlayer();
             ConfigureIconsAndSplash();
             ConfigureAudio();
+            ConfigureAds();
             CreateScene();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -75,6 +77,52 @@ namespace Gita.EditorTools
 
             importer.SaveAndReimport();
             Debug.Log("[Config] Audio configured.");
+        }
+
+        // ------------------------------------------------------------------
+        // ads
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Writes the AdMob app ID into the Google Mobile Ads settings asset, which is
+        /// where the plugin's own build step takes it from for the Android manifest.
+        ///
+        /// The build refuses to run without an app ID, and one that does not match the ad
+        /// units means no adverts at all, so GitaBuild runs this before every build as
+        /// well as it running here. The ID itself lives in AdIds, beside the unit IDs.
+        /// </summary>
+        public static void ConfigureAds()
+        {
+            // The settings type is internal to the plugin, so it is reached by name.
+            var type = System.Type.GetType(
+                "GoogleMobileAds.Editor.GoogleMobileAdsSettings, GoogleMobileAds.Editor");
+            var load = type?.GetMethod("LoadInstance", BindingFlags.Static | BindingFlags.NonPublic);
+            if (load?.Invoke(null, null) is not ScriptableObject settings)
+            {
+                Debug.LogError("[Config] Google Mobile Ads settings not found - " +
+                               "is com.google.ads.mobile in Packages/manifest.json?");
+                return;
+            }
+
+            var so = new SerializedObject(settings);
+            var appId = so.FindProperty("adMobAndroidAppId");
+            if (appId == null)
+            {
+                Debug.LogError("[Config] adMobAndroidAppId not found in the Google Mobile Ads settings.");
+                return;
+            }
+
+            if (appId.stringValue != Gita.App.AdIds.AndroidApp)
+            {
+                appId.stringValue = Gita.App.AdIds.AndroidApp;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                AssetDatabase.SaveAssets();
+            }
+
+            if (Gita.App.AdIds.UsingTestIds)
+                Debug.LogWarning("[Config] AdMob test IDs are in use - this build shows test " +
+                                 "adverts and earns nothing. Set the real ones in AdIds.cs.");
+            Debug.Log($"[Config] Ads configured ({Gita.App.AdIds.AndroidApp}).");
         }
 
         // ------------------------------------------------------------------
@@ -218,7 +266,7 @@ namespace Gita.EditorTools
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android,
                 "com.theops.bhagvadgeeta");
             PlayerSettings.bundleVersion = "1.0.0";
-            PlayerSettings.Android.bundleVersionCode = 1;
+            PlayerSettings.Android.bundleVersionCode = 4;
 
             // Linear colour is what makes the dawn grade read correctly.
             PlayerSettings.colorSpace = ColorSpace.Linear;

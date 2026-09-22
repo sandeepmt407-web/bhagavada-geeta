@@ -10,6 +10,7 @@ namespace Gita.UI
     public sealed class ChaptersScreen : ScreenBase
     {
         public override Shot CameraShot => Shot.Chapters;
+        public override App.BannerSlot Banner => App.BannerSlot.Bottom;
 
         const float CardHeightBase = 224f;
         const float CardGap = 18f;

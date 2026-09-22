@@ -26,6 +26,7 @@ namespace Gita.App
         public Canvas Canvas { get; private set; }
 
         ReaderScreen _reader;
+        SafeAreaFitter _safeArea;
 
         readonly Dictionary<ScreenId, ScreenBase> _screens = new();
         readonly List<ScreenId> _history = new();
@@ -56,6 +57,10 @@ namespace Gita.App
 
             ApplyDeviceTier();
             BuildInterface();
+
+            // Before the first screen is shown, so that screen's banner slot is recorded
+            // even though no advert can load until consent and start-up are done.
+            Ads.Create(transform, _safeArea);
 
             // Home is always the bottom of the stack. On a first run the language
             // choice is put in front of it, so the reader starts in their own language.
@@ -225,8 +230,8 @@ namespace Gita.App
             // account for the gesture strip here - the footer of the reader ended up
             // underneath the phone's back control.
             var safe = UIKit.Node("SafeArea", canvasGo.transform);
-            var fitter = SafeAreaFitter.Attach(safe);
-            SystemBarScrim.Create((RectTransform)canvasGo.transform, fitter,
+            _safeArea = SafeAreaFitter.Attach(safe);
+            SystemBarScrim.Create((RectTransform)canvasGo.transform, _safeArea,
                 Theme.NightDeep.WithAlpha(0.9f));
 
             Add<HomeScreen>(ScreenId.Home, safe);
@@ -265,6 +270,7 @@ namespace Gita.App
 
             entering.Show(fade);
             Director.CutTo(entering.CameraShot, fade * 4.5f);
+            Ads.Instance?.Place(entering.Banner);
         }
 
         public void OpenChapter(int chapter)

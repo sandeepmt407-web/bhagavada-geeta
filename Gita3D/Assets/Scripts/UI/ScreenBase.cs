@@ -1,4 +1,5 @@
 using UnityEngine;
+using Gita.App;
 using Gita.World;
 
 namespace Gita.UI
@@ -14,6 +15,9 @@ namespace Gita.UI
 
         /// <summary>The composition the camera holds while this screen is up.</summary>
         public abstract Shot CameraShot { get; }
+
+        /// <summary>Where this screen carries a banner ad, if it carries one at all.</summary>
+        public virtual BannerSlot Banner => BannerSlot.None;
 
         float _targetAlpha;
         float _fadeSpeed = 4f;

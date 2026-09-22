@@ -189,6 +189,16 @@ namespace Gita.UI
 
             if (DailyVerse.Enabled) HourRow();
 
+            // Only where the law gives the reader a standing choice about advertising
+            // data - the EEA, the UK and Switzerland. Everywhere else there is nothing to
+            // choose, so no row.
+            if (Ads.PrivacyOptionsRequired)
+            {
+                Heading("PRIVACY");
+                Row("Privacy choices", "What adverts may do with your data", false,
+                    () => Ads.Instance?.ShowPrivacyOptions(Rebuild));
+            }
+
             LayoutRebuilder.ForceRebuildLayoutImmediate(_content);
         }
 

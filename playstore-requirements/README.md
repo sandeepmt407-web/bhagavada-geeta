@@ -125,6 +125,46 @@ match exactly.
 
 ---
 
+## 5. Ads
+
+The app is now free and ad-supported (see "Ads" in the main README for what shows where).
+
+**app-ads.txt is live** at https://myweb-d8cca.web.app/app-ads.txt:
+
+```
+google.com, pub-5452237321152820, DIRECT, f08c47fec0942fa0
+```
+
+It lives in `legal/public/` and deploys with the legal pages. AdMob finds it through the
+**website** on your Play listing, so in the Play Console set *Store settings → Store
+listing contact details → Website* to `https://myweb-d8cca.web.app`. AdMob then verifies
+it within a day or so; until it does, it marks earnings as at risk.
+
+In AdMob:
+
+1. Add the app (Android), and link it to the Play listing once it is published. Until
+   it is linked and reviewed, AdMob serves few real adverts or none.
+2. Two ad units exist - banner `1904875466` and interstitial `5652548786` - and they and
+   the app ID are in `Gita3D/Assets/Scripts/App/AdIds.cs`.
+3. On the **banner** ad unit, set *Advanced settings → Automatic refresh → Custom* to
+   **30 seconds**. The refresh rate lives there; the app cannot set it.
+4. Under *Privacy & messaging*, publish a **GDPR** message. Readers in the EEA, UK and
+   Switzerland see it on first launch; without it they get limited adverts or none.
+5. Under *Settings → Test devices*, add your own phone, so it shows test adverts. Tapping
+   real ones on your own device counts as invalid traffic.
+
+**The listing and the privacy policy still say there are no ads.** Both have to be
+rewritten before publishing: the full description's "NO ACCOUNT, NO ADVERTS, NO
+TRACKING" section, the alternative short descriptions, "Contains ads", the data-safety
+answers (the ads SDK collects the advertising ID, approximate location, app interactions
+and diagnostics, and shares them for advertising), and the privacy policy's "no
+advertising… no third-party software development kits". Declaring "no ads" on an app
+that has them is a Play policy violation.
+
+Set the price to **Free**. That is one-way: Play never lets a free app become paid.
+
+---
+
 ## Still outstanding before you can publish
 
 | Item | Status |
@@ -136,6 +176,9 @@ match exactly.
 | 512×512 listing icon | Not exported yet |
 | Signed AAB | **Blocked** — every build so far used the debug key, because `GITA_KEYSTORE_PASS` was never set in the build shell. Play will reject a debug-signed bundle. |
 | Signing certificate name | Still reads `CN=Bhagavad Gita 3D` from before the rename. Cosmetic and invisible to users, but it can only be changed by generating a new key — free now, impossible after your first upload. |
+| app-ads.txt | Done — live; set the listing's website to `https://myweb-d8cca.web.app` (step 5) |
+| AdMob app and ad unit IDs | Done — in `AdIds.cs`; set the banner's refresh to 30 seconds in AdMob (step 5) |
+| Listing, privacy policy, data safety | **Must be rewritten for ads** — they still say there are none (step 5) |
 
 ---
 

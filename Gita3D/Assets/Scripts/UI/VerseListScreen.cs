@@ -17,6 +17,9 @@ namespace Gita.UI
     {
         public override Shot CameraShot => Shot.Chapters;
 
+        /// <summary>Search, Saved and Collections all carry the banner at their foot.</summary>
+        public override BannerSlot Banner => BannerSlot.Bottom;
+
         protected abstract string Title { get; }
 
         /// <summary>Height reserved under the header, for a search box or similar.</summary>
@@ -58,6 +61,9 @@ namespace Gita.UI
                 Theme.Serif, Theme.SizeHeading, Theme.Cream, TextAlignmentOptions.Center);
             title.rectTransform.TopBand(64f, 52f, Theme.Gutter + 140f);
             title.overflowMode = TextOverflowModes.Ellipsis;
+            // At the larger text sizes the heading is taller than its band, and an
+            // ellipsised line that does not fit is not drawn at all.
+            title.Fit();
 
             _countLabel = UIKit.Text("Count", Header, "",
                 Theme.Sans, 23f, Theme.Muted, TextAlignmentOptions.Center);

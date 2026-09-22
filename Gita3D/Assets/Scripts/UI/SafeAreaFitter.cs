@@ -18,14 +18,38 @@ namespace Gita.UI
         /// <summary>Extra clearance beyond the bar itself, in reference units.</summary>
         const float Breathing = 10f;
 
+        /// <summary>How often the insets are asked for once the layout has settled.</summary>
+        const float PollSeconds = 0.3f;
+
         RectTransform _rt;
         Rect _lastSafe;
         Vector2Int _lastScreen;
         Vector4 _lastNative;
-        float _settleTimer;
+        float _settleTimer, _pollTimer;
+        Vector2 _banner;   // top, bottom, in device pixels
 
         /// <summary>The insets actually applied, in canvas reference units.</summary>
         public Vector4 Applied { get; private set; }   // left, top, right, bottom
+
+        /// <summary>
+        /// The system bars and the cutout alone, in device pixels - what a banner ad has to
+        /// sit against, before any room is made for it.
+        /// </summary>
+        public Vector4 SystemPixels { get; private set; }   // left, top, right, bottom
+
+        /// <summary>
+        /// Holds the layout clear of a banner ad as well as of the system bars. Each value
+        /// is the distance in device pixels from that edge of the screen to the far side
+        /// of the banner, so it already includes the bar the banner sits against; zero
+        /// means there is no banner at that end.
+        /// </summary>
+        public void SetBannerClearance(float topPixels, float bottomPixels)
+        {
+            var banner = new Vector2(topPixels, bottomPixels);
+            if (banner == _banner) return;
+            _banner = banner;
+            Apply(force: true);
+        }
 
         public static SafeAreaFitter Attach(RectTransform target)
         {
@@ -55,14 +79,25 @@ namespace Gita.UI
                 SystemInsets.Refresh();
             }
 
-            if (_settleTimer <= 0f) return;
+            // Poll every few frames while things settle, then a few times a second for
+            // as long as the app runs. The navigation bar comes and goes - fullscreen
+            // hides it, a touch brings it back - and nothing the layout listens to
+            // changes when it does, so the only way to follow it is to keep asking:
+            // the full height while it is hidden, clear of it while it shows. Apply
+            // exits early when nothing has changed, so a quiet poll costs a comparison.
+            if (_settleTimer > 0f)
+            {
+                _settleTimer -= Time.unscaledDeltaTime;
+                if (Time.frameCount % 15 == 0) SystemInsets.Refresh();
+                Apply(force: false);
+                return;
+            }
 
-            // Poll while things settle. Apply itself exits early when nothing has
-            // changed, so this costs a comparison per frame for a couple of seconds
-            // after a rotation and nothing at all once the layout is stable.
-            _settleTimer -= Time.unscaledDeltaTime;
-            if (Time.frameCount % 15 == 0) SystemInsets.Refresh();
-            Apply(force: false);
+            _pollTimer -= Time.unscaledDeltaTime;
+            if (_pollTimer > 0f) return;
+            _pollTimer = PollSeconds;
+            Apply(force: false);        // what the last request brought back
+            SystemInsets.Refresh();     // and ask again
         }
 
         void Apply(bool force)
@@ -91,6 +126,13 @@ namespace Gita.UI
             float top    = Mathf.Max(uTop,    native.y);
             float right  = Mathf.Max(uRight,  native.z);
             float bottom = Mathf.Max(uBottom, native.w);
+
+            SystemPixels = new Vector4(left, top, right, bottom);
+
+            // A banner sits against the bar, so its clearance already contains it: the
+            // larger of the two, again, rather than the sum.
+            top    = Mathf.Max(top,    _banner.x);
+            bottom = Mathf.Max(bottom, _banner.y);
 
             // A canvas scaled to a reference resolution measures in its own units, so
             // convert out of device pixels before setting offsets.

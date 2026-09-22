@@ -26,6 +26,12 @@ namespace Gita.UI
     {
         public override Shot CameraShot => Shot.Reader;
 
+        /// <summary>
+        /// At the top: the footer holds Next, tapped on every verse, and a banner under it
+        /// would collect accidental clicks.
+        /// </summary>
+        public override BannerSlot Banner => BannerSlot.Top;
+
         enum Tab { Translation, Poetic, Hindi, WordByWord }
 
         /// <summary>A tab as actually offered for the current language.</summary>
@@ -534,7 +540,16 @@ namespace Gita.UI
         {
             if (_flatIndex >= GitaDatabase.Verses.Length - 1) return;
             _flatIndex++;
-            Refresh();
+
+            // Every fifth verse read forward brings an interstitial. The page turns
+            // underneath it, and the new verse is read aloud once it has gone.
+            bool advert = Ads.Instance != null && Ads.Instance.VerseCompleted(OnAdvertDismissed);
+            Refresh(speak: !advert);
+        }
+
+        void OnAdvertDismissed()
+        {
+            if (IsVisible && AppSettings.AudioEnabled) SpeakCurrent();
         }
 
         void Previous()

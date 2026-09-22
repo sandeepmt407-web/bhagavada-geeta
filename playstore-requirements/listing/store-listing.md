@@ -1,5 +1,10 @@
 # Play Store listing copy
 
+> **Out of date: the app now carries ads.** The "no adverts / no tracking" copy,
+> "Contains ads: No" and the data-safety answers below were written for the paid,
+> ad-free version and are now false. Rewrite them before pasting anything — see
+> "5. Ads" in `../README.md`.
+
 Paste each block into the matching field in the Play Console.
 
 ---

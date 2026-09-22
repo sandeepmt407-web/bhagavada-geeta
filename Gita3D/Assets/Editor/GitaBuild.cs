@@ -85,6 +85,7 @@ namespace Gita.EditorTools
             Debug.Log($"[Build] Starting {label}...");
 
             ApplySigning();
+            ProjectConfig.ConfigureAds();
 
             if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
             {
